@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
 
   elasticsearch:
-    image: elasticsearch:8.12.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
@@ -19,23 +17,16 @@ services:
       timeout: 10s
       retries: 5
 
-  kibana:
-    image: kibana:8.12.0
-    container_name: kibana
-    ports:
-      - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-
   scraping:
     build: ./scraping
     container_name: scraping
+    environment:
+      - ELASTIC_HOST=http://elasticsearch:9200
     depends_on:
       elasticsearch:
         condition: service_healthy
+    volumes:
+      - ./data/ldlc_reviews.json:/data/ldlc_reviews.json:ro
     restart: "no"
 
   api:
@@ -43,6 +34,8 @@ services:
     container_name: api
     ports:
       - "8000:8000"
+    environment:
+      - ELASTIC_HOST=http://elasticsearch:9200
     depends_on:
       elasticsearch:
         condition: service_healthy

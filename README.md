@@ -11,14 +11,14 @@ Plateforme d'analyse des avis clients LDLC (Trustpilot & Google).
 ```bash
 git clone https://github.com/Gin-Max/Satisfaction-client
 cd satisfaction-client
-docker-compose up -d --build
+docker compose build
+docker compose up -d
 ```
  
 
 | Service       | URL                        | Description             |
 | ------------- | -------------------------- | ----------------------- |
 | Elasticsearch | http://localhost:9200      | Base de données         |
-| Kibana        | http://localhost:5601      | Exploration des données |
 | FastAPI       | http://localhost:8000      | API REST                |
 | FastAPI Docs  | http://localhost:8000/docs | Documentation API       |
 
@@ -39,6 +39,9 @@ satisfaction-client/
 ├── airflow/        ← ? (à venir)
 └── monitoring/     ← Prometheus + Grafana (à venir)
 
+# vérifier le nombre d'avis sur elasticsearch
+curl http://localhost:9200/reviews/_count
+
 # Voir les logs
 docker logs api
 docker logs elasticsearch
@@ -46,6 +49,9 @@ docker logs elasticsearch
 # Arrêter les services
 docker-compose down
 
-# Rebuild un service
-docker-compose build --no-cache api
+# ou Arrêter les services + vider la base de données persistante et relancer
+docker compose down -v
+docker compose build
+docker compose up -d
+
 ```

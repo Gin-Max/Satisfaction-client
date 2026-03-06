@@ -5,6 +5,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY scraper.py .
+COPY . .
 
-CMD ["python", "scraper.py"]
+CMD ["python", "main.py"]
