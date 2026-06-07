@@ -9,10 +9,10 @@ es = Elasticsearch("http://elasticsearch:9200")
 def home():
     return {"status": "API OK ✅"}
 
-# Récupérer tous les avis
+# Récupérer tous les avis (j'ai un peu modifié pour le ML)
 @app.get("/avis")
 def get_avis():
-    result = es.search(index="avis_bruts", body={"query": {"match_all": {}}})
+    result = es.search(index="reviews", body={"query": {"match_all": {}}}, size=10000)
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
