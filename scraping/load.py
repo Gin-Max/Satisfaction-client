@@ -20,10 +20,12 @@ def create_index_if_not_exists(client, index_name):
                 "review_id": {"type": "keyword"},
                 "likes": {"type": "integer"},
                 "source": {"type": "keyword"},
+                "store": {"type": "keyword"},              # Nouveau: nom du magasin (Google)
                 "rating": {"type": "integer"},
                 "title": {"type": "text"},
                 "text": {"type": "text"},
                 "published_date": {"type": "date"},
+                "relative_date": {"type": "keyword"},      # Nouveau: "il y a 3 mois" (Google)
                 "author_id": {"type": "keyword"},
                 "author_name": {"type": "keyword"},
                 "author_review_count": {"type": "integer"},
