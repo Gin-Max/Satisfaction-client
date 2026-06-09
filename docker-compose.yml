@@ -62,16 +62,7 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
     entrypoint: >
-      bash -c "
-        airflow db migrate &&
-        airflow users create
-          --username admin
-          --password admin
-          --firstname Admin
-          --lastname Admin
-          --role Admin
-          --email admin@example.com
-      "
+      bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@example.com"
     volumes:
       - .:/opt/airflow/project:rw
       - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro

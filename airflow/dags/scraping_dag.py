@@ -11,6 +11,7 @@ default_args = {
     dag_id="scraping_reviews_weekly",
     description="Scraping Trustpilot + Google, transform et chargement dans ES",
     schedule_interval="0 6 * * 1",  # lundi 6h
+    #schedule_interval="0 6 * * *" # Daily (tous les jours 6h)
     start_date=datetime(2025, 10, 29),
     catchup=False,
     max_active_runs=1,
