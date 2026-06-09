@@ -21,7 +21,7 @@ def get_avis():
 def get_avis_by_source(source: str):
     result = es.search(index="reviews", body={
         "query": {"match": {"source": source}}
-    })
+    }, size=10000)
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
@@ -30,6 +30,6 @@ def get_avis_by_source(source: str):
 def get_avis_by_note(note: int):
     result = es.search(index="reviews", body={
         "query": {"match": {"rating": note}}
-    })
+    }, size=10000)
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
