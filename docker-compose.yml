@@ -1,5 +1,5 @@
 services:
-
+  # ELASTICSEARCH
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
     container_name: elasticsearch
@@ -17,18 +17,7 @@ services:
       timeout: 10s
       retries: 5
 
-  scraping:
-    build: ./scraping
-    container_name: scraping
-    environment:
-      - ELASTIC_HOST=http://elasticsearch:9200
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    volumes:
-      - ./data/ldlc_reviews.json:/data/ldlc_reviews.json:ro
-    restart: "no"
-
+  # API
   api:
     build: ./api
     container_name: api
@@ -41,5 +30,113 @@ services:
         condition: service_healthy
     restart: always
 
+  # AIRFLOW — POSTGRES (métadonnées)
+  airflow-postgres:
+    image: postgres:16-alpine
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+
+  # AIRFLOW — INIT
+  airflow-init:
+    image: apache/airflow:2.9.2-python3.11
+    container_name: airflow-init
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    entrypoint: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname Admin
+          --role Admin
+          --email admin@example.com
+      "
+    volumes:
+      - .:/opt/airflow/project:rw
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
+      - airflow_logs:/opt/airflow/logs
+
+  # AIRFLOW — WEBSERVER (UI port 8080)
+  airflow-webserver:
+    image: apache/airflow:2.9.2-python3.11
+    container_name: airflow-webserver
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
+      PYTHONPATH: /opt/airflow/project
+      ELASTIC_HOST: http://elasticsearch:9200
+    ports:
+      - "8080:8080"
+    command: ["airflow", "webserver"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - .:/opt/airflow/project:rw
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
+      - airflow_logs:/opt/airflow/logs
+
+  # AIRFLOW — SCHEDULER
+  airflow-scheduler:
+    image: apache/airflow:2.9.2-python3.11
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
+      PYTHONPATH: /opt/airflow/project
+      ELASTIC_HOST: http://elasticsearch:9200
+    command: ["airflow", "scheduler"]
+    restart: unless-stopped
+    volumes:
+      - .:/opt/airflow/project:rw
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
+      - airflow_logs:/opt/airflow/logs
+
 volumes:
   es_data:
+  airflow_pg_data:
+  airflow_logs:
