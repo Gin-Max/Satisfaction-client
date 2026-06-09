@@ -93,9 +93,13 @@ def extract(client):
     existing_reviews = []
     if is_empty and os.path.exists(HISTORICAL_JSON):
         print("Chargement historique depuis JSON...")
-        with open(HISTORICAL_JSON, "r", encoding="utf-8") as f:
-            existing_reviews = json.load(f)
-        print(f"{len(existing_reviews)} reviews historiques chargées")
+        try:
+            with open(HISTORICAL_JSON, "r", encoding="utf-8") as f:
+                existing_reviews = json.load(f)
+            print(f"{len(existing_reviews)} reviews historiques chargées")
+        except json.JSONDecodeError as e:
+            print(f"Fichier JSON invalide (peut-être un pointeur Git LFS): {e}")
+            print("Démarrage sans historique...")
 
     # Scrape les nouvelles reviews
     new_reviews = scrape_pages()

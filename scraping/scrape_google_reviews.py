@@ -324,7 +324,7 @@ def main():
     log(f"{total_existing} avis existants en base pour {len(existing_reviews)} magasins.")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(locale="fr-FR")
         page = context.new_page()
 
