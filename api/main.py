@@ -19,7 +19,7 @@ def get_avis():
 # Récupérer les avis par source
 @app.get("/avis/{source}")
 def get_avis_by_source(source: str):
-    result = es.search(index="avis_bruts", body={
+    result = es.search(index="reviews", body={
         "query": {"match": {"source": source}}
     })
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
@@ -28,7 +28,7 @@ def get_avis_by_source(source: str):
 # Récupérer les avis par note
 @app.get("/avis/note/{note}")
 def get_avis_by_note(note: int):
-    result = es.search(index="avis_bruts", body={
+    result = es.search(index="reviews", body={
         "query": {"match": {"rating": note}}
     })
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
