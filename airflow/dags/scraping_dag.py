@@ -27,8 +27,8 @@ def pipeline():
 
     @task()
     def scrape_google() -> list:
-        from scraping.scrape_google_reviews import scrape_google_reviews
-        return scrape_google_reviews()
+        from scraping.scrape_google_reviews import main
+        return main()
 
     @task()
     def transform_and_load(tp_reviews: list, g_reviews: list):
