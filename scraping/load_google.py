@@ -36,8 +36,13 @@ def load_google_to_elasticsearch(reviews, client, index_name=INDEX_NAME):
     if not reviews:
         print("Aucun avis Google à indexer")
         return
-    actions = [{"_index": index_name, "_id": review["review_id"], "_source": review} for review in reviews]
-    success_count, errors = helpers.bulk(client, actions, raise_on_error=False, raise_on_exception=False)
+    actions = [
+        {"_index": index_name, "_id": review["review_id"], "_source": review}
+        for review in reviews
+    ]
+    success_count, errors = helpers.bulk(
+        client, actions, raise_on_error=False, raise_on_exception=False
+    )
     if errors:
         print(f"Erreurs lors de l'indexation: {len(errors)}")
     print(f"{success_count} avis Google indexés dans Elasticsearch")

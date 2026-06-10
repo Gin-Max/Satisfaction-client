@@ -23,6 +23,9 @@ def test_normalize_google_review_basic_fields():
 
 def test_transform_deduplicates_reviews():
     existing = [{"review_id": "1", "title": "A", "text": "A", "rating": 5}]
-    new = [{"review_id": "1", "title": "B", "text": "B", "rating": 1}, {"review_id": "2", "title": "C", "text": "C", "rating": 4}]
+    new = [
+        {"review_id": "1", "title": "B", "text": "B", "rating": 1},
+        {"review_id": "2", "title": "C", "text": "C", "rating": 4},
+    ]
     result = transform(existing, new)
     assert [r["review_id"] for r in result] == ["1", "2"]

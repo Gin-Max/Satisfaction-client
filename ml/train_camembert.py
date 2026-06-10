@@ -16,7 +16,11 @@ df = pd.DataFrame(data["avis"])
 df = df[df["rating"] != 3]
 df["sentiment_reel"] = df["rating"].apply(lambda x: 1 if x >= 4 else 0)
 df_sample = df.sample(n=min(1000, len(df)), random_state=42)
-classifier = pipeline(task="sentiment-analysis", model="cmarkea/distilcamembert-base-sentiment", tokenizer="cmarkea/distilcamembert-base-sentiment")
+classifier = pipeline(
+    task="sentiment-analysis",
+    model="cmarkea/distilcamembert-base-sentiment",
+    tokenizer="cmarkea/distilcamembert-base-sentiment",
+)
 predictions_hf = classifier(df_sample["text"].tolist(), truncation=True, batch_size=32)
 predictions_binaires = []
 for pred in predictions_hf:

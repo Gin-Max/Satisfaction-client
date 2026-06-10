@@ -30,7 +30,9 @@ def nettoyer_texte(texte):
 
 
 df["texte_propre"] = df["text"].apply(nettoyer_texte)
-X_train, X_test, y_train, y_test = train_test_split(df["texte_propre"], df["sentiment"], test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    df["texte_propre"], df["sentiment"], test_size=0.2, random_state=42
+)
 
 with mlflow.start_run(run_name="Baseline_TFIDF_LogReg"):
     vectorizer = TfidfVectorizer(max_features=1000, stop_words=None)

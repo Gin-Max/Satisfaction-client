@@ -19,6 +19,7 @@ def pipeline():
     @task()
     def check_es_connection() -> bool:
         from scraping.load import get_es_client
+
         client = get_es_client()
         return client.ping()
 
@@ -27,6 +28,7 @@ def pipeline():
         if not es_ok:
             raise Exception("Elasticsearch inaccessible, entraînement annulé")
         import runpy
+
         runpy.run_module("ml.train", run_name="__main__")
 
     es_ok = check_es_connection()
