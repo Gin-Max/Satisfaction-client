@@ -25,6 +25,18 @@ def get_avis_by_note(note: int):
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
+# Récupérer les derniers avis
+@app.get("/avis/recents")
+def get_avis_recents(limit: int = 10):
+    """Retourne les N avis les plus récents."""
+    result = es.search(index="reviews", body={
+        "query": {"exists": {"field": "published_date"}},
+        "sort": [{"published_date": {"order": "desc"}}],
+        "size": limit
+    })
+    avis = [hit["_source"] for hit in result["hits"]["hits"]]
+    return {"total": len(avis), "avis": avis}
+
 # Récupérer les avis par source
 @app.get("/avis/{source}")
 def get_avis_by_source(source: str):

@@ -57,6 +57,13 @@ def get_avis():
         return requests.get(f"{API_URL}/avis").json()
     except:
         return None
+    
+@st.cache_data(ttl=3600)
+def get_avis_recents():
+    try:
+        return requests.get(f"{API_URL}/avis/recents").json()
+    except:
+        return None
 
 
 # KPI
@@ -154,12 +161,17 @@ if reponse_data:
             title={"text": "Taux de réponse (%)"},
             gauge={
                 "axis": {"range": [0, 100]},
-                "bar": {"color": "#2ecc71"},
+                "bar": {"color": "rgba(0,0,0,0)"},  # barre transparente
                 "steps": [
                     {"range": [0, 33], "color": "#e74c3c"},
                     {"range": [33, 66], "color": "#f39c12"},
                     {"range": [66, 100], "color": "#2ecc71"},
-                ]
+                ],
+                "threshold": {
+                    "line": {"color": "black", "width": 4},
+                    "thickness": 0.75,
+                    "value": reponse_data["taux"]
+                }
             }
         ))
         st.plotly_chart(fig, use_container_width=True)
@@ -195,14 +207,10 @@ else:
 st.divider()
 
 # derniers avis
-st.subheader("Derniers avis")
-if avis_data and avis_data["avis"]:
-    avis_tries = sorted(
-        avis_data["avis"],
-        key=lambda x: x.get("published_date") or "",
-        reverse=True
-    )[:10]
-    for avis in avis_tries:
+st.subheader("10 derniers avis")
+recents_data = get_avis_recents()
+if recents_data and recents_data["avis"]:
+    for avis in recents_data["avis"]:
         with st.expander(f"⭐ {avis.get('rating', '?')} — {avis.get('author_name', 'Anonyme')} — {avis.get('published_date', '')[:10] if avis.get('published_date') else ''}"):
             st.write(avis.get("text", "Pas de commentaire"))
             if avis.get("has_reply"):
