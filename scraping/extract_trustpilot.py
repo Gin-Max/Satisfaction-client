@@ -1,8 +1,9 @@
+import json
+import os
+import time
+
 import requests
 from bs4 import BeautifulSoup
-import json
-import time
-import os
 
 BASE_URL = "https://fr.trustpilot.com/review/www.ldlc.com"
 HISTORICAL_JSON = "/data/ldlc_reviews.json"
@@ -11,14 +12,15 @@ INDEX_NAME = "reviews"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Accept-Language": "fr-FR,fr;q=0.9",
-    "Referer": "https://fr.trustpilot.com/"
+    "Referer": "https://fr.trustpilot.com/",
 }
 
 
 def get_page_json(page):
     url = f"{BASE_URL}?page={page}" if page > 1 else BASE_URL
     print(f"Scraping page {page}")
-    response = requests.get(url, headers=HEADERS)
+    response = requests.get(url, headers=HEADERS, timeout=30)
+    response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     script_tag = soup.find("script", id="__NEXT_DATA__")
     if not script_tag:
@@ -38,28 +40,27 @@ def extract_reviews_from_data(data):
         verification = r.get("labels", {}).get("verification", {}) or {}
         dates = r.get("dates", {})
         reply = r.get("reply")
-
-        review = {
-            "review_id": r.get("id"),
-            "likes": r.get("likes"),
-            "source": r.get("source"),
-            "rating": r.get("rating"),
-            "title": r.get("title"),
-            "text": r.get("text"),
-            "published_date": dates.get("publishedDate"),
-            "author_id": consumer.get("id"),
-            "author_name": consumer.get("displayName"),
-            "author_review_count": consumer.get("numberOfReviews"),
-            "consumer_reviews_same_domain": r.get("consumersReviewCountOnSameDomain"),
-            "author_is_verified": consumer.get("isVerified"),
-            "verification_is_verified": verification.get("isVerified"),
-            "review_source_name": verification.get("reviewSourceName"),
-            "has_reply": reply is not None,
-            "reply_published_date": reply.get("publishedDate") if reply else None,
-            "reply_message": reply.get("message") if reply else None
-        }
-
-        reviews_clean.append(review)
+        reviews_clean.append(
+            {
+                "review_id": r.get("id"),
+                "likes": r.get("likes"),
+                "source": r.get("source"),
+                "rating": r.get("rating"),
+                "title": r.get("title"),
+                "text": r.get("text"),
+                "published_date": dates.get("publishedDate"),
+                "author_id": consumer.get("id"),
+                "author_name": consumer.get("displayName"),
+                "author_review_count": consumer.get("numberOfReviews"),
+                "consumer_reviews_same_domain": r.get("consumersReviewCountOnSameDomain"),
+                "author_is_verified": consumer.get("isVerified"),
+                "verification_is_verified": verification.get("isVerified"),
+                "review_source_name": verification.get("reviewSourceName"),
+                "has_reply": reply is not None,
+                "reply_published_date": reply.get("publishedDate") if reply else None,
+                "reply_message": reply.get("message") if reply else None,
+            }
+        )
     return reviews_clean
 
 
@@ -78,16 +79,9 @@ def scrape_pages(num_pages=10):
 
 
 def extract(client):
-    """
-    Retourne :
-    - existing_reviews : historique uniquement si ES est vide
-    - new_reviews : nouvelles reviews scrapées
-    """
-    # Vérifie si Elasticsearch est vide ou index inexistant
     try:
         is_empty = client.count(index=INDEX_NAME)["count"] == 0
     except Exception:
-        # Si l'index n'existe pas, considérer que c'est vide
         is_empty = True
 
     existing_reviews = []
@@ -101,8 +95,6 @@ def extract(client):
             print(f"Fichier JSON invalide (peut-être un pointeur Git LFS): {e}")
             print("Démarrage sans historique...")
 
-    # Scrape les nouvelles reviews
     new_reviews = scrape_pages()
     print(f"{len(new_reviews)} nouvelles reviews extraites")
-
     return existing_reviews, new_reviews

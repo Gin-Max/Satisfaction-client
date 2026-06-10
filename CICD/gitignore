@@ -13,5 +13,3 @@ venv/
 .vscode/
 coverage.xml
 htmlcov/
-mlruns/
-playwright/.cache/

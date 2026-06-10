@@ -1,0 +1,8 @@
+black==24.10.0
+flake8==7.1.1
+pytest==8.3.3
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+elasticsearch==8.12.0
+requests==2.32.3
+beautifulsoup4==4.12.3

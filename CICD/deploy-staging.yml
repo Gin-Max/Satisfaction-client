@@ -1,0 +1,26 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Deploy on remote server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd ${{ secrets.STAGING_APP_DIR }}
+            git pull origin develop
+            docker compose pull
+            docker compose up -d --build
+            docker image prune -f

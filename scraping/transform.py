@@ -8,28 +8,19 @@ def clean_text(text):
 
 
 def generate_review_id(author, text, store):
-    """Génère un ID unique pour un avis Google basé sur auteur + texte + magasin."""
     content = f"{author}|{text[:50]}|{store}".lower()
     return f"google_{hashlib.md5(content.encode()).hexdigest()[:12]}"
 
 
 def normalize_google_review(row):
-    """
-    Transforme une ligne du CSV Google au format Elasticsearch.
-    """
     author = clean_text(row.get("Auteur", ""))
     text = clean_text(row.get("Commentaire", ""))
     store = clean_text(row.get("Magasin", ""))
-
-    # Convertir la note en entier
     try:
         rating = int(row.get("Note", 0))
     except (ValueError, TypeError):
         rating = 0
-
-    # Convertir la réponse en booléen
     has_reply = str(row.get("Reponse", "")).lower() in ["oui", "o", "yes", "true", "1"]
-
     return {
         "review_id": generate_review_id(author, text, store),
         "likes": 0,
@@ -76,21 +67,13 @@ def normalize_review(review):
 
 
 def transform(existing_reviews, new_reviews):
-    """
-    Fusionne les reviews historiques et les nouvelles,
-    supprime les doublons, et normalise chaque review.
-    """
-    # Fusionne historique + nouvelles
     all_reviews = existing_reviews + new_reviews
-
-    # Supprime les doublons par review_id et normalise
     seen_ids = set()
     final_reviews = []
-    for r in all_reviews:
-        rid = r.get("review_id")
-        if rid and rid not in seen_ids:
-            seen_ids.add(rid)
-            final_reviews.append(normalize_review(r))
-
+    for review in all_reviews:
+        review_id = review.get("review_id")
+        if review_id and review_id not in seen_ids:
+            seen_ids.add(review_id)
+            final_reviews.append(normalize_review(review))
     print(f"{len(final_reviews)} reviews après transformation (historique + nouvelles)")
     return final_reviews
