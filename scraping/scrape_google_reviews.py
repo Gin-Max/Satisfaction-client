@@ -177,7 +177,7 @@ def scrape_reviews_from_maps(page, store_name, google_url, existing_keys):
                 note,
                 date: date.trim(),
                 text: text.trim(),
-                response: hasResponse
+                response: hasResponse,
             };
         })
         """)
