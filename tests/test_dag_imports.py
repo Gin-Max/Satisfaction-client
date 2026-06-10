@@ -1,4 +1,7 @@
 import importlib
+import pytest
+
+pytest.importorskip("airflow.decorators")
 
 
 def test_scraping_dag_imports():
