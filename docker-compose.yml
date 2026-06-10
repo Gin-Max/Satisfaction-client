@@ -126,6 +126,17 @@ services:
       - .:/opt/airflow/project:rw
       - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
       - airflow_logs:/opt/airflow/logs
+  
+  streamlit:
+    build: ./streamlit
+    container_name: streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    restart: always
 
 volumes:
   es_data:
