@@ -41,15 +41,14 @@ def setup_csv():
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(
-                ["Magasin", "Auteur", "Note", "Date", "Commentaire", "Reponse"]
-            )
+            writer.writerow(["Magasin", "Auteur", "Note", "Date", "Commentaire", "Reponse"])
 
 
 def get_stores_list(page):
     page.goto("https://www.ldlc.com/magasins-ldlc/")
     page.wait_for_load_state("networkidle")
-    stores = page.evaluate("""
+    stores = page.evaluate(
+        """
         () => {
             const links = Array.from(document.querySelectorAll('a'));
             const stores = [];
@@ -64,14 +63,16 @@ def get_stores_list(page):
             }
             return Array.from(new Map(stores.map(item => [item.url, item])).values());
         }
-        """)
+        """
+    )
     return stores
 
 
 def get_google_reviews_link(page, store_url):
     page.goto(store_url)
     page.wait_for_load_state("networkidle")
-    return page.evaluate("""
+    return page.evaluate(
+        """
         () => {
             const links = Array.from(document.querySelectorAll('a'));
             const isGoogleMapsLink = (href) =>
@@ -103,7 +104,8 @@ def get_google_reviews_link(page, store_url):
 
             return null;
         }
-        """)
+        """
+    )
 
 
 def handle_google_cookies(page):
@@ -125,8 +127,7 @@ def scrape_reviews_from_maps(page, store_name, google_url, existing_keys):
 
     try:
         avis_tab = page.locator(
-            "button[role='tab']:has-text('Avis'), "
-            "button[role='tab']:has-text('Reviews')"
+            "button[role='tab']:has-text('Avis'), " "button[role='tab']:has-text('Reviews')"
         )
         if avis_tab.count() > 0:
             avis_tab.first.click()
@@ -154,7 +155,8 @@ def scrape_reviews_from_maps(page, store_name, google_url, existing_keys):
             no_change_count = 0
             previous_count = current_count
 
-    all_reviews = page.evaluate("""
+    all_reviews = page.evaluate(
+        """
         () => Array.from(document.querySelectorAll('div.jftiEf')).map(node => {
             const author =
                 node.querySelector('.d4r55')?.innerText ||
@@ -180,7 +182,8 @@ def scrape_reviews_from_maps(page, store_name, google_url, existing_keys):
                 response: hasResponse,
             };
         })
-        """)
+        """
+    )
 
     new_reviews = []
     for review in all_reviews:
@@ -228,9 +231,7 @@ def main():
                 if not google_url:
                     continue
 
-                new_reviews = scrape_reviews_from_maps(
-                    page, store_name, google_url, existing_keys
-                )
+                new_reviews = scrape_reviews_from_maps(page, store_name, google_url, existing_keys)
 
                 if new_reviews:
                     save_reviews_to_csv(store_name, new_reviews)

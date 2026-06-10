@@ -37,8 +37,7 @@ def load_google_to_elasticsearch(reviews, client, index_name=INDEX_NAME):
         print("Aucun avis Google à indexer")
         return
     actions = [
-        {"_index": index_name, "_id": review["review_id"], "_source": review}
-        for review in reviews
+        {"_index": index_name, "_id": review["review_id"], "_source": review} for review in reviews
     ]
     success_count, errors = helpers.bulk(
         client, actions, raise_on_error=False, raise_on_exception=False

@@ -56,9 +56,7 @@ def normalize_review(review):
         "author_id": review.get("author_id"),
         "author_name": clean_text(review.get("author_name")),
         "author_review_count": int(review.get("author_review_count", 0)),
-        "consumer_reviews_same_domain": int(
-            review.get("consumer_reviews_same_domain", 0)
-        ),
+        "consumer_reviews_same_domain": int(review.get("consumer_reviews_same_domain", 0)),
         "author_is_verified": bool(review.get("author_is_verified", False)),
         "verification_is_verified": bool(review.get("verification_is_verified", False)),
         "review_source_name": review.get("review_source_name"),

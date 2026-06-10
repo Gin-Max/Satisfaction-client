@@ -1,0 +1,4 @@
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+required-version = "24.10.0"

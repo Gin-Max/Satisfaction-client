@@ -52,9 +52,7 @@ def extract_reviews_from_data(data):
                 "author_id": consumer.get("id"),
                 "author_name": consumer.get("displayName"),
                 "author_review_count": consumer.get("numberOfReviews"),
-                "consumer_reviews_same_domain": r.get(
-                    "consumersReviewCountOnSameDomain"
-                ),
+                "consumer_reviews_same_domain": r.get("consumersReviewCountOnSameDomain"),
                 "author_is_verified": consumer.get("isVerified"),
                 "verification_is_verified": verification.get("isVerified"),
                 "review_source_name": verification.get("reviewSourceName"),
