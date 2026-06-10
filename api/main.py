@@ -34,3 +34,108 @@ def get_avis_by_source(source: str):
     avis = [hit["_source"] for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
+
+# dashboard
+@app.get("/stats/distribution-notes")
+def get_distribution_notes():
+    """Distribution des avis par note (1 à 5 étoiles)."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "aggs": {
+            "par_note": {
+                "terms": {
+                    "field": "rating",
+                    "size": 5,
+                    "order": {"_key": "asc"}
+                }
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_note"]["buckets"]
+    return {
+        "distribution": [
+            {"note": b["key"], "count": b["doc_count"]}
+            for b in buckets
+        ]
+    }
+
+@app.get("/stats/evolution-mensuelle")
+def get_evolution_mensuelle():
+    """Nombre d'avis par mois."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "query": {
+            "exists": {"field": "published_date"}
+        },
+        "aggs": {
+            "par_mois": {
+                "date_histogram": {
+                    "field": "published_date",
+                    "calendar_interval": "month",
+                    "format": "yyyy-MM"
+                }
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_mois"]["buckets"]
+    return {
+        "evolution": [
+            {"mois": b["key_as_string"], "count": b["doc_count"]}
+            for b in buckets
+        ]
+    }
+
+@app.get("/stats/taux-reponse")
+def get_taux_reponse():
+    """Taux de réponse de l'entreprise aux avis."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "aggs": {
+            "par_reponse": {
+                "terms": {"field": "has_reply"}
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_reponse"]["buckets"]
+    total = sum(b["doc_count"] for b in buckets)
+    avec_reponse = next((b["doc_count"] for b in buckets if b["key"] == 1), 0)
+    return {
+        "total": total,
+        "avec_reponse": avec_reponse,
+        "sans_reponse": total - avec_reponse,
+        "taux": round(avec_reponse / total * 100, 1) if total > 0 else 0
+    }
+
+@app.get("/stats/note-moyenne")
+def get_note_moyenne():
+    """Note moyenne globale."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "aggs": {
+            "note_moyenne": {"avg": {"field": "rating"}},
+            "total": {"value_count": {"field": "rating"}}
+        }
+    })
+    return {
+        "moyenne": round(result["aggregations"]["note_moyenne"]["value"] or 0, 2),
+        "total_avis": result["aggregations"]["total"]["value"]
+    }
+
+@app.get("/stats/verified")
+def get_verified():
+    """Répartition avis vérifiés vs non vérifiés."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "aggs": {
+            "par_verification": {
+                "terms": {"field": "verification_is_verified"}
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_verification"]["buckets"]
+    return {
+        "verification": [
+            {"verifie": bool(b["key"]), "count": b["doc_count"]}
+            for b in buckets
+        ]
+    }
