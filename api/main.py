@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from elasticsearch import Elasticsearch
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI()
+
+# Prometheus metrics
+Instrumentator().instrument(app).expose(app)
 es = Elasticsearch("http://elasticsearch:9200")
 
 # Route de test

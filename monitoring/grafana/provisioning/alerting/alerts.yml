@@ -1,0 +1,225 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: LDLC Alerts
+    folder: LDLC
+    interval: 1m
+    rules:
+      # Alerte: Taux d'erreur API > 5%
+      - uid: api-error-rate
+        title: API - Taux d'erreur elevé
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(http_requests_total{job="fastapi", status=~"5.."}[5m]))
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(http_requests_total{job="fastapi"}[5m]))
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: ($A / $B) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Le taux d'erreur API dépasse 5%"
+          description: "Taux d'erreur actuel: {{ $values.C }}%"
+        labels:
+          severity: critical
+
+      # Alerte: Latence API p95 > 2s
+      - uid: api-latency-high
+        title: API - Latence elevée (p95 > 2s)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="fastapi"}[5m])) by (le))
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "La latence API p95 dépasse 2 secondes"
+          description: "Latence p95 actuelle: {{ $values.A }}s"
+        labels:
+          severity: warning
+
+      # Alerte: CPU container > 80%
+      - uid: container-cpu-high
+        title: Container - CPU elevé (> 80%)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(container_cpu_usage_seconds_total{name=~".+"}[1m])) by (name) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "CPU container dépasse 80%"
+          description: "Container {{ $labels.name }} utilise {{ $values.A }}% CPU"
+        labels:
+          severity: warning
+
+      # Alerte: Airflow DAG failed
+      - uid: airflow-dag-failed
+        title: Airflow - DAG en échec
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: increase(airflow_ti_failures[1h])
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Une tâche Airflow a échoué"
+          description: "{{ $values.A }} tâche(s) en échec dans la dernière heure"
+        labels:
+          severity: critical

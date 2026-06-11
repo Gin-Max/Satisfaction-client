@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Métriques API FastAPI
+  - job_name: 'fastapi'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: /metrics
+
+  # Métriques Elasticsearch (via exporter)
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+
+  # Métriques Airflow (via statsd-exporter)
+  - job_name: 'airflow'
+    static_configs:
+      - targets: ['statsd-exporter:9102']
+
+  # Métriques CPU/RAM containers (via cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
