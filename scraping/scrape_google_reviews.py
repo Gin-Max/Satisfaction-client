@@ -20,7 +20,7 @@ def log(msg):
 
 # Configuration
 DATA_DIR = "data"
-CSV_FILE = os.path.join(DATA_DIR, "all_reviews.csv")
+CSV_FILE = os.path.join(DATA_DIR, "google_reviews.csv")
 STATUS_FILE = "scraping_status.json"
 MAX_SCROLL_ATTEMPTS = 100  # Limite de sécurité pour éviter boucle infinie
 
