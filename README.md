@@ -11,8 +11,7 @@ Plateforme d'analyse des avis clients LDLC (Trustpilot & Google).
 ```bash
 git clone https://github.com/Gin-Max/Satisfaction-client
 cd satisfaction-client
-docker compose build
-docker compose up -d
+docker-compose up -d --build
 ```
  
 
@@ -21,6 +20,8 @@ docker compose up -d
 | Elasticsearch | http://localhost:9200      | Base de données         |
 | FastAPI       | http://localhost:8000      | API REST                |
 | FastAPI Docs  | http://localhost:8000/docs | Documentation API       |
+| Airflow       | http://localhost:8080      | Dags Airflow            |
+| Streamlit     | http://localhost:8501      | Dashboard Streamlit     |
 
 | Route                 | Description                           |
 | --------------------- | ------------------------------------- |
@@ -35,8 +36,8 @@ satisfaction-client/
 ├── scraping/       ← collecte des avis
 ├── api/            ← API REST FastAPI
 ├── ml/             ← modèle NLP (à venir)
-├── dashboard/      ← ? (à venir)
-├── airflow/        ← ? (à venir)
+├── streamlit/      ← Dashboard streamlit
+├── airflow/        ← dags airflow
 └── monitoring/     ← Prometheus + Grafana (à venir)
 
 # vérifier le nombre d'avis sur elasticsearch
