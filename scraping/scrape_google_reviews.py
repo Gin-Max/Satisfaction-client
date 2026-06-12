@@ -381,6 +381,3 @@ def main():
     log(f"  Données sauvegardées dans: {CSV_FILE}")
     log("=" * 60)
 
-
-if __name__ == "__main__":
-    main()

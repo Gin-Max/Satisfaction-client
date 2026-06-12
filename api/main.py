@@ -1,8 +1,22 @@
 from fastapi import FastAPI
 from elasticsearch import Elasticsearch
 from prometheus_fastapi_instrumentator import Instrumentator
+from typing import Optional
 
 app = FastAPI()
+
+def build_filters(source: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> list:
+    filters = []
+    if source:
+        filters.append({"term": {"source": source}})
+    if date_from or date_to:
+        date_range = {}
+        if date_from:
+            date_range["gte"] = date_from
+        if date_to:
+            date_range["lte"] = date_to
+        filters.append({"range": {"published_date": date_range}})
+    return filters
 
 # Prometheus metrics
 Instrumentator().instrument(app).expose(app)
@@ -51,19 +65,16 @@ def get_avis_by_source(source: str):
     return {"total": len(avis), "avis": avis}
 
 
-# dashboard
 @app.get("/stats/distribution-notes")
-def get_distribution_notes():
-    """Distribution des avis par note (1 à 5 étoiles)."""
+def get_distribution_notes(source: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    filters = build_filters(source, date_from, date_to)
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
     result = es.search(index="reviews", body={
         "size": 0,
+        "query": query,
         "aggs": {
             "par_note": {
-                "terms": {
-                    "field": "rating",
-                    "size": 5,
-                    "order": {"_key": "asc"}
-                }
+                "terms": {"field": "rating", "size": 5, "order": {"_key": "asc"}}
             }
         }
     })
@@ -76,13 +87,12 @@ def get_distribution_notes():
     }
 
 @app.get("/stats/evolution-mensuelle")
-def get_evolution_mensuelle():
-    """Nombre d'avis par mois."""
+def get_evolution_mensuelle(source: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    filters = build_filters(source, date_from, date_to)
+    query = {"bool": {"filter": [{"exists": {"field": "published_date"}}] + filters}} if filters else {"exists": {"field": "published_date"}}
     result = es.search(index="reviews", body={
         "size": 0,
-        "query": {
-            "exists": {"field": "published_date"}
-        },
+        "query": query,
         "aggs": {
             "par_mois": {
                 "date_histogram": {
@@ -123,10 +133,12 @@ def get_taux_reponse():
     }
 
 @app.get("/stats/note-moyenne")
-def get_note_moyenne():
-    """Note moyenne globale."""
+def get_note_moyenne(source: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None):
+    filters = build_filters(source, date_from, date_to)
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
     result = es.search(index="reviews", body={
         "size": 0,
+        "query": query,
         "aggs": {
             "note_moyenne": {"avg": {"field": "rating"}},
             "total": {"value_count": {"field": "rating"}}

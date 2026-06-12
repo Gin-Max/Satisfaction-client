@@ -34,6 +34,7 @@ def normalize_google_review(row):
         "review_id": generate_review_id(author, text, store),
         "likes": 0,
         "source": "google",
+        "provenance" : "Organic",
         "store": store,
         "rating": rating,
         "title": "",
@@ -57,7 +58,8 @@ def normalize_review(review):
     return {
         "review_id": str(review.get("review_id")),
         "likes": int(review.get("likes", 0)),
-        "source": review.get("source", ""),
+        "source" : "trustpilot",
+        "provenance": review.get("source", ""),
         "rating": int(review.get("rating", 0)),
         "title": clean_text(review.get("title")),
         "text": clean_text(review.get("text")),

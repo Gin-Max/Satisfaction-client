@@ -20,12 +20,13 @@ def create_index_if_not_exists(client, index_name):
                 "review_id": {"type": "keyword"},
                 "likes": {"type": "integer"},
                 "source": {"type": "keyword"},
-                "store": {"type": "keyword"},              # Nouveau: nom du magasin (Google)
+                "provenance": {"type": "keyword"},
+                "store": {"type": "keyword"},
                 "rating": {"type": "integer"},
                 "title": {"type": "text"},
                 "text": {"type": "text"},
                 "published_date": {"type": "date"},
-                "relative_date": {"type": "keyword"},      # Nouveau: "il y a 3 mois" (Google)
+                "relative_date": {"type": "keyword"},
                 "author_id": {"type": "keyword"},
                 "author_name": {"type": "keyword"},
                 "author_review_count": {"type": "integer"},
@@ -52,14 +53,13 @@ def load_to_elasticsearch(reviews, client, index_name=INDEX_NAME):
     actions = [
         {
             "_index": index_name,
-            "_id": review["review_id"],  # _id = review_id pour éviter les doublons
+            "_id": review["review_id"],
             "_source": review,
-            "op_type": "create"          # 'create' échoue si _id existe déjà
+            "op_type": "create"
         }
         for review in reviews
     ]
 
-    # helpers.bulk avec raise_on_error=False ne lève pas d'exception
     success_count, _ = helpers.bulk(client, actions, raise_on_error=False)
 
     print(f"{success_count} nouvelles reviews réellement indexées dans Elasticsearch")
