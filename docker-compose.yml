@@ -48,7 +48,7 @@ services:
 
   # AIRFLOW — INIT
   airflow-init:
-    image: apache/airflow:2.9.2-python3.11
+    build: ./airflow
     container_name: airflow-init
     depends_on:
       airflow-postgres:
@@ -67,10 +67,11 @@ services:
       - .:/opt/airflow/project:rw
       - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
       - airflow_logs:/opt/airflow/logs
+      - playwright_cache:/home/airflow/.cache/ms-playwright
 
   # AIRFLOW — WEBSERVER (UI port 8080)
   airflow-webserver:
-    image: apache/airflow:2.9.2-python3.11
+    build: ./airflow
     container_name: airflow-webserver
     depends_on:
       airflow-postgres:
@@ -106,10 +107,11 @@ services:
       - .:/opt/airflow/project:rw
       - ./airflow/requirements.txt:/opt/airflow/requirements.txt:ro
       - airflow_logs:/opt/airflow/logs
+      - playwright_cache:/home/airflow/.cache/ms-playwright
 
   # AIRFLOW — SCHEDULER
   airflow-scheduler:
-    image: apache/airflow:2.9.2-python3.11
+    build: ./airflow
     container_name: airflow-scheduler
     depends_on:
       airflow-postgres:
@@ -224,3 +226,4 @@ volumes:
   airflow_logs:
   prometheus_data:
   grafana_data:
+  playwright_cache: 

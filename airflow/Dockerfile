@@ -1,7 +1,5 @@
 FROM apache/airflow:2.9.2-python3.11
-
 USER root
-
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libnss3 \
@@ -20,5 +18,8 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
+USER airflow
+RUN pip install playwright && playwright install chromium
+USER root
+RUN /home/airflow/.local/bin/playwright install-deps chromium
 USER airflow

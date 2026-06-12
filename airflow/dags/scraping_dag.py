@@ -3,7 +3,7 @@ from airflow.decorators import dag, task
 
 default_args = {
     "owner": "data-eng",
-    "retries": 2,
+    "retries": 0,
     "retry_delay": timedelta(minutes=5),
 }
 
