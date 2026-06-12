@@ -167,3 +167,79 @@ def get_verified():
             for b in buckets
         ]
     }
+
+@app.get("/stats/date-min")
+def get_date_min(source: Optional[str] = None):
+    filters = build_filters(source, None, None)
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "query": query,
+        "aggs": {
+            "date_min": {"min": {"field": "published_date"}}
+        }
+    })
+    date_min = result["aggregations"]["date_min"]["value_as_string"] if result["aggregations"]["date_min"]["value"] else None
+    return {"date_min": date_min}
+
+@app.get("/stats/google/stores")
+def get_google_stores():
+    """Liste des agences Google avec note moyenne et nb avis."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "query": {"term": {"source": "google"}},
+        "aggs": {
+            "par_store": {
+                "terms": {"field": "store", "size": 100},
+                "aggs": {
+                    "note_moyenne": {"avg": {"field": "rating"}},
+                }
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_store"]["buckets"]
+    return [
+        {
+            "store": b["key"],
+            "note_moyenne": round(b["note_moyenne"]["value"] or 0, 2),
+            "nb_avis": b["doc_count"]
+        }
+        for b in buckets
+    ]
+
+
+@app.get("/stats/google/store-distribution")
+def get_google_store_distribution(store: str):
+    """Distribution des notes pour une agence Google."""
+    result = es.search(index="reviews", body={
+        "size": 0,
+        "query": {"bool": {"filter": [
+            {"term": {"source": "google"}},
+            {"term": {"store": store}}
+        ]}},
+        "aggs": {
+            "par_note": {
+                "terms": {"field": "rating", "size": 5, "order": {"_key": "asc"}}
+            }
+        }
+    })
+    buckets = result["aggregations"]["par_note"]["buckets"]
+    return {
+        "distribution": [
+            {"note": b["key"], "count": b["doc_count"]}
+            for b in buckets
+        ]
+    }
+
+
+@app.get("/stats/google/store-reviews")
+def get_google_store_reviews(store: str, limit: int = 10):
+    """Derniers avis pour une agence Google."""
+    result = es.search(index="reviews", body={
+        "size": limit,
+        "query": {"bool": {"filter": [
+            {"term": {"source": "google"}},
+            {"term": {"store": store}}
+        ]}},
+    })
+    return [hit["_source"] for hit in result["hits"]["hits"]]

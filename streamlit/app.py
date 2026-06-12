@@ -10,7 +10,7 @@ from datetime import datetime, date
 
 # config
 API_URL = "http://api:8000"
-COORDS_CACHE = "/app/agences_coords.json"
+COORDS_CACHE = "/app/cache/agences_coords.json"
 
 st.set_page_config(
     page_title="LDLC – Satisfaction Client",
@@ -181,6 +181,14 @@ def get_google_store_distribution(store: str):
         return r.json() if r.ok else {}
     except Exception:
         return {}
+    
+@st.cache_data(ttl=300)
+def get_date_min(source: str):
+    try:
+        r = requests.get(f"{API_URL}/stats/date-min", params={"source": source}, timeout=10)
+        return r.json() if r.ok else {}
+    except Exception:
+        return {}
 
 STAR_COLORS = {
     1: "#e74c3c",
@@ -218,15 +226,17 @@ def render_review_card(review: dict):
 
 # nav
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/fr/6/6e/LDLC_logo.svg", width=120)
+    st.image("/app/ldlc_logo.png", width=120)
     st.markdown("---")
     page = st.radio(
         "Navigation",
-        ["📊 Trustpilot", "🗺️ Google Maps"],
+        ["📊 Trustpilot", "🗺️ Google"],
         label_visibility="collapsed",
     )
 
-
+date_min_data = get_date_min("trustpilot")
+date_min_str = date_min_data.get("date_min", "2020-01-01")[:10]
+date_min = date.fromisoformat(date_min_str)
 
 # page TP
 if page == "📊 Trustpilot":
@@ -235,7 +245,7 @@ if page == "📊 Trustpilot":
     # dates
     col_d1, col_d2, col_d3 = st.columns([2, 2, 4])
     with col_d1:
-        date_from = st.date_input("Du", value=date(2024, 1, 1), key="tp_from")
+        date_from = st.date_input("Du", value=date_min, key="tp_from")
     with col_d2:
         date_to = st.date_input("Au", value=date.today(), key="tp_to")
 
@@ -246,10 +256,8 @@ if page == "📊 Trustpilot":
 
     # kpis
     note_data = get_note_moyenne("trustpilot", df_str, dt_str)
-    total_data = get_total_avis("trustpilot", df_str, dt_str)
-
     note_moy = note_data.get("moyenne", 0)
-    total = total_data.get("total_avis", 0)
+    total = note_data.get("total_avis", 0)
 
     kpi1, kpi2 = st.columns(2)
     kpi1.metric("⭐ Note moyenne", f"{note_moy:.2f} / 5" if note_moy else "–")
@@ -267,13 +275,14 @@ if page == "📊 Trustpilot":
         st.subheader("Distribution des notes")
         if buckets:
             df_dist = pd.DataFrame(buckets).sort_values("note")
+            df_dist["note"] = df_dist["note"].astype(str)
             df_dist["couleur"] = df_dist["note"].map(STAR_COLORS)
             fig = px.bar(
                 df_dist,
                 x="note",
                 y="count",
                 color="note",
-                color_discrete_map=STAR_COLORS,
+                color_discrete_map={str(k): v for k, v in STAR_COLORS.items()},
                 labels={"note": "Note", "count": "Nombre d'avis"},
                 text="count",
             )
@@ -326,9 +335,9 @@ if page == "📊 Trustpilot":
 
 
 
-# Google maps
-elif page == "🗺️ Google Maps":
-    st.title("🗺️ Avis Google Maps – Agences LDLC")
+# Google
+elif page == "🗺️ Google":
+    st.title("🗺️ Avis Google – Agences LDLC")
     st.markdown("---")
 
     stores_data = get_google_stores()
@@ -420,10 +429,6 @@ elif page == "🗺️ Google Maps":
         store_reviews = get_google_store_reviews(selected_store, limit=10)
         if store_reviews:
             for avis in store_reviews:
-                st.expander(
-                    f"⭐ {avis.get('rating', '?')} — {avis.get('author_name', 'Anonyme')} — "
-                    f"{avis.get('relative_date', '')}"
-                )
                 with st.expander(
                     f"⭐ {avis.get('rating', '?')} — {avis.get('author_name', 'Anonyme')}"
                 ):

@@ -149,6 +149,8 @@ services:
     depends_on:
       - api
     restart: always
+    volumes:
+      - ./streamlit/cache:/app/cache
 
   # MONITORING - PROMETHEUS
   prometheus:
