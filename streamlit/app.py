@@ -433,7 +433,7 @@ elif page == "🗺️ Google":
                     f"⭐ {avis.get('rating', '?')} — {avis.get('author_name', 'Anonyme')}"
                 ):
                     st.write(avis.get("text", "Pas de commentaire"))
-                    if avis.get("has_reply"):
+                    if avis.get("has_reply") and avis.get("reply_message"):
                         st.info(f"💬 Réponse : {avis.get('reply_message', '')}")
         else:
             st.warning("Aucun avis disponible.")
