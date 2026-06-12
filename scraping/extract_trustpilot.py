@@ -145,7 +145,7 @@ def is_trustpilot_empty(client):
         return True
 
 def main():
-    from load import get_es_client
+    from scraping.load import get_es_client
     client = get_es_client()
     existing_reviews = load_historical_reviews() if is_trustpilot_empty(client) else []
     new_reviews = scrape_pages(num_pages=10)

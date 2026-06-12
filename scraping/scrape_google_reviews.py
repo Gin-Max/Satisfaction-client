@@ -73,7 +73,8 @@ def get_stores_list(page):
     Retourne une liste de dicts avec 'name' et 'url'.
     """
     log("Navigation vers la page des magasins LDLC...")
-    page.goto("https://www.ldlc.com/magasins-ldlc/")
+    response = page.goto("https://www.ldlc.com/magasins-ldlc/")
+    log(f"Status code: {response.status}")
     page.wait_for_load_state("networkidle")
 
     log("Extraction de la liste des magasins...")
@@ -324,7 +325,14 @@ def main():
     log(f"{total_existing} avis existants en base pour {len(existing_reviews)} magasins.")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ]
+        )
         context = browser.new_context(locale="fr-FR")
         page = context.new_page()
 
