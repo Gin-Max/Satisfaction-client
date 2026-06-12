@@ -5,9 +5,8 @@ import os
 from playwright.sync_api import sync_playwright
 
 BASE_URL = "https://fr.trustpilot.com/review/www.ldlc.com"
-HISTORICAL_JSON = "/data/ldlc_reviews.json"
+HISTORICAL_JSON = os.path.join(os.path.dirname(__file__), "..", "data", "ldlc_reviews.json")
 INDEX_NAME = "reviews"
-
 
 def extract_reviews_from_data(data):
     try:
