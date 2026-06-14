@@ -26,12 +26,10 @@ def pipeline():
         return main()
 
     @task()
-    def scrape_google() -> str:
-        """Scrape les avis Google et sauvegarde en CSV. Retourne le chemin du CSV."""
+    def scrape_google() -> list:
+        """Scrape les avis Google. Retourne la liste des reviews (historique + nouveaux)."""
         from scraping.scrape_google_reviews import main
-        main()
-        from scraping.load_google import GOOGLE_CSV
-        return GOOGLE_CSV
+        return main()
 
     @task()
     def load_trustpilot(tp_reviews: list):
@@ -49,23 +47,21 @@ def pipeline():
         load_to_elasticsearch(final, client)
 
     @task()
-    def load_google(csv_path: str):
-        """Charge les avis Google depuis le CSV dans ES."""
-        from scraping.load_google import (
-            load_google_reviews_from_csv,
-            transform_google_reviews,
-            load_google_to_elasticsearch,
+    def load_google(google_reviews: list):
+        """Charge les avis Google dans ES."""
+        from scraping.load import (
+            get_es_client,
+            create_index_if_not_exists,
+            load_to_elasticsearch,
+            INDEX_NAME,
         )
-        from scraping.load import get_es_client, create_index_if_not_exists, INDEX_NAME
         client = get_es_client()
         create_index_if_not_exists(client, INDEX_NAME)
-        raw_reviews = load_google_reviews_from_csv(csv_path)
-        transformed_reviews = transform_google_reviews(raw_reviews)
-        load_google_to_elasticsearch(transformed_reviews, client)
+        load_to_elasticsearch(google_reviews, client)
 
     tp = scrape_trustpilot()
-    csv_path = scrape_google()
+    google = scrape_google()
     load_trustpilot(tp)
-    load_google(csv_path)
+    load_google(google)
 
 dag = pipeline()
