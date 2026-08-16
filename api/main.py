@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from elasticsearch import Elasticsearch
-from prometheus_fastapi_instrumentator import Instrumentator
+#from prometheus_fastapi_instrumentator import Instrumentator
 from typing import Optional
 
 app = FastAPI()
@@ -19,7 +19,7 @@ def build_filters(source: Optional[str], date_from: Optional[str], date_to: Opti
     return filters
 
 # Prometheus metrics
-Instrumentator().instrument(app).expose(app)
+#Instrumentator().instrument(app).expose(app)
 es = Elasticsearch("http://elasticsearch:9200")
 
 # Route de test
@@ -27,12 +27,36 @@ es = Elasticsearch("http://elasticsearch:9200")
 def home():
     return {"status": "API OK ✅"}
 
-# Récupérer tous les avis (j'ai un peu modifié pour le ML)
+# Récupérer tous les avis pour le ML
 @app.get("/avis")
-def get_avis():
-    result = es.search(index="reviews", body={"query": {"match_all": {}}}, size=10000)
-    avis = [hit["_source"] for hit in result["hits"]["hits"]]
-    return {"total": len(avis), "avis": avis}
+def get_avis(from_: int = 0, size: int = 1000):
+    result = es.search(
+        index="reviews", 
+        query={"match_all": {}},
+        from_=from_,
+        size=size
+    )
+    
+    # Sécurité : Si aucun hit (la base est vide à cet index ou on a dépassé la fin)
+    hits = result["hits"]["hits"]
+    if not hits:
+        return {
+            "total_dans_la_base": result["hits"]["total"]["value"],
+            "taille_paquet": 0,
+            "avis": []
+        }
+        
+    avis = []
+    for hit in hits:
+        doc = hit["_source"]
+        doc["id"] = hit["_id"]
+        avis.append(doc)
+        
+    return {
+        "total_dans_la_base": result["hits"]["total"]["value"],
+        "taille_paquet": len(avis),
+        "avis": avis
+    }
 
 # Récupérer les avis par note
 @app.get("/avis/note/{note}")

@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import re
+import joblib
 import mlflow
 import mlflow.sklearn
 from sklearn.model_selection import train_test_split
@@ -80,6 +81,9 @@ with mlflow.start_run(run_name="Baseline_TFIDF_LogReg"):
     model = LogisticRegression(C=C_REGULARIZATION)
     model.fit(X_train_vec, y_train)
     
+    joblib.dump(vectorizer, "api/tfidf_vectorizer.pkl")
+    joblib.dump(model, "api/logistic_regression_model.pkl")
+
     # Évaluation
     predictions = model.predict(X_test_vec)
     accuracy = accuracy_score(y_test, predictions)
