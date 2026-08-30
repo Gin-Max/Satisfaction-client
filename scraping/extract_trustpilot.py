@@ -90,8 +90,13 @@ def scrape_pages(num_pages=10):
                 html = page.content()
 
                 if "verifying" in html.lower() or "captcha" in html.lower():
-                    print("⚠️ Blocage anti-bot détecté (verifying/captcha)")
-                    break
+                    print("❌ Blocage anti-bot détecté (verifying/captcha)")
+                    raise RuntimeError(
+                        "Scraping Trustpilot bloqué par la protection AWS WAF/CloudFront "
+                        "(Challenge Captcha) — "
+                        "Le blocage est spécifique à l'environnement Docker/Linux et ne "
+                        "reproduit pas en exécution locale native."
+                    )
 
                 content = page.evaluate(
                     "() => document.getElementById('__NEXT_DATA__')?.textContent"
@@ -112,11 +117,12 @@ def scrape_pages(num_pages=10):
 
                 print(f"✔ Page {num}: {len(reviews)} reviews (total {len(all_reviews)})")
 
-                # pause “humaine”
                 time.sleep(random.uniform(2.0, 4.0))
 
             except Exception as e:
                 print(f"❌ Erreur page {num}: {repr(e)}")
+                if isinstance(e, RuntimeError):
+                    raise
                 break
 
         browser.close()
