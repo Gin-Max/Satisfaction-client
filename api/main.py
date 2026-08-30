@@ -25,7 +25,7 @@ es = Elasticsearch("http://elasticsearch:9200")
 # Route de test
 @app.get("/")
 def home():
-    return {"status": "API OK ✅"}
+    return {"status": "API OK"}
 
 # Récupérer tous les avis pour le ML
 @app.get("/avis")

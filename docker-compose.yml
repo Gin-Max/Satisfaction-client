@@ -58,6 +58,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret-key" 
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
@@ -87,6 +88,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret-key" 
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
       PYTHONPATH: /opt/airflow/project
       ELASTIC_HOST: http://elasticsearch:9200
@@ -127,6 +129,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/airflow/dags
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret-key" 
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
       PYTHONPATH: /opt/airflow/project
       ELASTIC_HOST: http://elasticsearch:9200
