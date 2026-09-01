@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task # type: ignore (car le Docker tourne sur le conteneur)
 
 default_args = {
     "owner": "data-eng",
@@ -19,6 +19,11 @@ default_args = {
 )
 def pipeline():
 
+    @task()
+    def backfill_existing_reviews():
+        """Vérifie si des avis anciens ne sont pas enrichis et les met à jour."""
+        from ml.enrichment import backfill_unenriched_reviews
+        backfill_unenriched_reviews()
 
     @task()
     def scrape_trustpilot() -> list:
@@ -31,6 +36,17 @@ def pipeline():
         from scraping.scrape_google_reviews import main
         return main()
 
+    @task()
+    def enrich_trustpilot(tp_reviews: list) -> list:
+        """Enrichit les avis Trustpilot avec le sentiment et la thématique prédits."""
+        from ml.enrichment import enrich_reviews
+        return enrich_reviews(tp_reviews)
+
+    @task()
+    def enrich_google(google_reviews: list) -> list:
+        """Enrichit les avis Google avec le sentiment et la thématique prédits."""
+        from ml.enrichment import enrich_reviews
+        return enrich_reviews(google_reviews)
     @task()
     def load_trustpilot(tp_reviews: list):
         """Transform et charge les avis Trustpilot dans ES."""
@@ -59,9 +75,12 @@ def pipeline():
         create_index_if_not_exists(client, INDEX_NAME)
         load_to_elasticsearch(google_reviews, client)
 
+    backfill_task = backfill_existing_reviews()
     tp = scrape_trustpilot()
+    tp_enriched = enrich_trustpilot(tp)
     google = scrape_google()
-    load_trustpilot(tp)
-    load_google(google)
+    google_enriched = enrich_google(google)
+    load_trustpilot(tp_enriched)
+    load_google(google_enriched)
 
 dag = pipeline()
