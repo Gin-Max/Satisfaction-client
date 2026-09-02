@@ -150,8 +150,8 @@ jobs:
       - name: Récupération du code
         uses: actions/checkout@v4
 
-      - name: Démarrage d'Elasticsearch
-        run: docker compose up -d elasticsearch
+      - name: Démarrage des services API
+        run: docker compose up -d elasticsearch api
 
       - name: Attente d'Elasticsearch
         run: |
@@ -163,9 +163,6 @@ jobs:
           done
           docker compose logs elasticsearch
           exit 1
-
-      - name: Démarrage de l'API
-        run: docker compose up -d api
 
       - name: Attente de l'API
         run: |
@@ -181,6 +178,7 @@ jobs:
       - name: Vérification des endpoints API
         run: |
           curl --fail --silent http://localhost:8000/
+          curl --fail --silent http://localhost:8000/avis
 
       - name: Arrêt des services
         if: always()
