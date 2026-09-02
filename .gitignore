@@ -14,4 +14,5 @@ ml/env_ml/
 env_ml/
 venv/
 .venv/
-env/
+env/*.py[cod]
+*.py[cod]
