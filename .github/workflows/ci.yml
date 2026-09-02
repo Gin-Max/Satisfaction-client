@@ -6,10 +6,12 @@ on:
       - main
       - develop
       - feature/cicd-test
+      - 'test/**'
   pull_request:
     branches:
       - main
       - develop
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -104,3 +106,34 @@ jobs:
 
       - name: Vérification syntaxique du DAG
         run: python -m py_compile airflow/dags/scraping_dag.py
+
+      - name: Mise en place de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construction de l'image Airflow
+        uses: docker/build-push-action@v6
+        with:
+          context: ./airflow
+          load: true
+          push: false
+          tags: satisfaction-client-airflow:ci
+
+      - name: Vérifier les fichiers de test
+        run: |
+          docker run --rm \
+            --entrypoint /bin/sh \
+            --workdir /opt/airflow/project \
+            -v "${{ github.workspace }}:/opt/airflow/project" \
+            satisfaction-client-airflow:ci \
+            -c "pwd && test -f tests/test_dags.py && ls -la tests"
+
+      - name: Tests pytest des DAGs Airflow
+        run: |
+          docker run --rm \
+            --entrypoint python \
+            --workdir /opt/airflow/project \
+            -e AIRFLOW__CORE__LOAD_EXAMPLES=false \
+            -e PYTHONPATH=/opt/airflow/project:/opt/airflow/project/airflow/dags \
+            -v "${{ github.workspace }}:/opt/airflow/project" \
+            satisfaction-client-airflow:ci \
+            -m pytest tests/test_dags.py -v
