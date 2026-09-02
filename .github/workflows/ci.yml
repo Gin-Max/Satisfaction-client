@@ -35,7 +35,7 @@ jobs:
 
       - name: Analyse statique
         run: |
-          ruff check scraping api ml airflow/dags streamlit --output-format=github || true
+          ruff check airflow/dags/notifications.py airflow/dags/scraping_dag.py --output-format=github
 
   python-syntax:
     name: Syntaxe Python
