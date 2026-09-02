@@ -150,8 +150,8 @@ jobs:
       - name: Récupération du code
         uses: actions/checkout@v4
 
-      - name: Démarrage des services API
-        run: docker compose up -d elasticsearch api
+      - name: Démarrage d'Elasticsearch
+        run: docker compose up -d elasticsearch
 
       - name: Attente d'Elasticsearch
         run: |
@@ -163,6 +163,34 @@ jobs:
           done
           docker compose logs elasticsearch
           exit 1
+
+      - name: Préparation des données de test Elasticsearch
+        run: |
+          curl --fail --silent \
+            -X PUT \
+            -H 'Content-Type: application/json' \
+            http://localhost:9200/reviews
+
+          curl --fail --silent \
+            -X PUT \
+            -H 'Content-Type: application/json' \
+            http://localhost:9200/reviews/_doc/ci-test-review \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "review_id": "ci-test-review",
+              "source": "ci",
+              "rating": 5,
+              "text": "Avis de test CI",
+              "published_date": "2026-01-01",
+              "has_reply": false
+            }'
+
+          curl --fail --silent \
+            -X POST \
+            http://localhost:9200/reviews/_refresh
+
+      - name: Démarrage de l'API
+        run: docker compose up -d api
 
       - name: Attente de l'API
         run: |
@@ -178,6 +206,7 @@ jobs:
       - name: Vérification des endpoints API
         run: |
           curl --fail --silent http://localhost:8000/
+          curl --fail --silent http://localhost:8000/avis
 
       - name: Logs en cas d'échec
         if: failure()
