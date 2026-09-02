@@ -121,17 +121,19 @@ jobs:
       - name: Vérifier les fichiers de test
         run: |
           docker run --rm \
+            --entrypoint /bin/sh \
             --workdir /opt/airflow/project \
             -v "${{ github.workspace }}:/opt/airflow/project" \
             satisfaction-client-airflow:ci \
-            sh -c "pwd && test -f tests/test_dags.py && ls -la tests"
+            -c "pwd && test -f tests/test_dags.py && ls -la tests"
 
       - name: Tests pytest des DAGs Airflow
         run: |
           docker run --rm \
+            --entrypoint python \
             --workdir /opt/airflow/project \
             -e AIRFLOW__CORE__LOAD_EXAMPLES=false \
             -e PYTHONPATH=/opt/airflow/project:/opt/airflow/project/airflow/dags \
             -v "${{ github.workspace }}:/opt/airflow/project" \
             satisfaction-client-airflow:ci \
-            python -m pytest tests/test_dags.py -v
+            -m pytest tests/test_dags.py -v
