@@ -8,6 +8,7 @@ on:
       - feature/cicd-test
       - 'test/**'
       - 'quality/**'
+      - 'ci/**'
   pull_request:
     branches:
       - main
@@ -29,14 +30,16 @@ jobs:
       - name: Installation de Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Installation de Ruff
         run: python -m pip install --upgrade pip ruff
 
-      - name: Analyse statique
-        run: |
-          ruff check airflow/dags/notifications.py airflow/dags/scraping_dag.py --output-format=github
+      - name: Analyse Ruff Airflow
+        run: ruff check airflow/dags/notifications.py airflow/dags/scraping_dag.py --output-format=github
+
+      - name: Analyse Ruff Streamlit
+        run: ruff check streamlit/app.py --output-format=github || true
 
   python-syntax:
     name: Syntaxe Python
@@ -49,7 +52,7 @@ jobs:
       - name: Installation de Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Compilation des fichiers Python
         run: |
@@ -138,3 +141,38 @@ jobs:
             -v "${{ github.workspace }}:/opt/airflow/project" \
             satisfaction-client-airflow:ci \
             -m pytest tests/test_dags.py -v
+
+  api-healthcheck:
+    name: Healthcheck API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Mise en place de Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construction de l'image API
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          load: true
+          push: false
+          tags: satisfaction-client-api:ci
+
+      - name: Vérification du démarrage de l'API
+        run: |
+          docker run -d \
+            --name satisfaction-client-api \
+            -p 8000:8000 \
+            satisfaction-client-api:ci
+
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:8000/; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl --fail --silent http://localhost:8000/
