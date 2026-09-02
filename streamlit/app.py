@@ -190,6 +190,27 @@ def get_date_min(source: str):
     except Exception:
         return {}
 
+# ml/sentiments
+@st.cache_data(ttl=60)
+def get_stats_sentiments(source: str = None, date_from: str = None, date_to: str = None) -> dict:
+    """Récupère la répartition des sentiments depuis l'API FastAPI."""
+    params = {}
+    if source:
+        params["source"] = source
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+
+    try:
+        response = requests.get(f"{API_URL}/stats/sentiments", params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as err:
+        print(f"[ERREUR API] get_stats_sentiments: {err}")
+        return {}
+
 STAR_COLORS = {
     1: "#e74c3c",
     2: "#e67e22",
@@ -259,9 +280,27 @@ if page == "📊 Trustpilot":
     note_moy = note_data.get("moyenne", 0)
     total = note_data.get("total_avis", 0)
 
-    kpi1, kpi2 = st.columns(2)
+    # Récupération des sentiments
+    sent_data = get_stats_sentiments(source="trustpilot", date_from=df_str, date_to=dt_str)
+    sent_list = sent_data.get("sentiments", [])
+
+    pct_positif = 0.0
+    pct_negatif = 0.0
+
+    for item in sent_list:
+        sentiment_nom = str(item.get("sentiment", "")).lower()
+        if "positif" in sentiment_nom:
+            pct_positif = float(item.get("pourcentage", 0.0))
+        elif "négatif" in sentiment_nom or "negatif" in sentiment_nom:
+            pct_negatif = float(item.get("pourcentage", 0.0))
+
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     kpi1.metric("⭐ Note moyenne", f"{note_moy:.2f} / 5" if note_moy else "–")
-    kpi2.metric("💬 Total avis", f"{total:,}".replace(",", " ") if total else "–")
+    kpi2.metric(
+        "💬 Total avis", f"{total:,}".replace(",", " ") if total else "–"
+    )
+    kpi3.metric("😊 Avis positifs", f"{pct_positif}%" if sent_list else "–")
+    kpi4.metric("😡 Avis négatifs", f"{pct_negatif}%" if sent_list else "–")
 
     st.markdown("---")
 

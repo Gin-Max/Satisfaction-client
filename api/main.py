@@ -267,3 +267,43 @@ def get_google_store_reviews(store: str, limit: int = 10):
         ]}},
     })
     return [hit["_source"] for hit in result["hits"]["hits"]]
+
+@app.get("/stats/sentiments")
+def get_stats_sentiments(
+    source: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """Calcule la répartition des sentiments prédits (positif, neutre, négatif)."""
+    filters = build_filters(source, date_from, date_to)
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
+
+    result = es.search(
+        index="reviews",
+        body={
+            "size": 0,
+            "query": query,
+            "aggs": {
+                "par_sentiment": {
+                    "terms": {"field": "sentiment_predit", "size": 5}
+                }
+            },
+        },
+    )
+
+    buckets = result["aggregations"]["par_sentiment"]["buckets"]
+    total = sum(b["doc_count"] for b in buckets)
+
+    return {
+        "total": total,
+        "sentiments": [
+            {
+                "sentiment": b["key"],
+                "count": b["doc_count"],
+                "pourcentage": round(b["doc_count"] / total * 100, 1)
+                if total > 0
+                else 0,
+            }
+            for b in buckets
+        ],
+    }

@@ -9,8 +9,8 @@ INDEX_NAME = "reviews"
 # 2. Chargement du modèle de sentiment
 print("Chargement du modèle de sentiment...")
 try:
-    vectorizer = joblib.load("api/tfidf_vectorizer.pkl")
-    model_sentiment = joblib.load("api/logistic_regression_model.pkl")
+    vectorizer = joblib.load("ml/tfidf_vectorizer.pkl")
+    model_sentiment = joblib.load("ml/logistic_regression_model.pkl")
     print("Modèle chargé.")
 except Exception as e:
     print(f"Erreur pkl : {e}")
