@@ -175,7 +175,6 @@ jobs:
             -X PUT \
             -H 'Content-Type: application/json' \
             'http://localhost:9200/reviews/_doc/ci-test-review?refresh=wait_for' \
-            -H 'Content-Type: application/json' \
             -d '{
               "review_id": "ci-test-review",
               "likes": 0,
