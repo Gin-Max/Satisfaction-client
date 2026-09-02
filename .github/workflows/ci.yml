@@ -180,6 +180,10 @@ jobs:
           curl --fail --silent http://localhost:8000/
           curl --fail --silent http://localhost:8000/avis
 
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs api elasticsearch
+
       - name: Arrêt des services
         if: always()
         run: docker compose down
