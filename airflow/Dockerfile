@@ -1,6 +1,8 @@
 FROM apache/airflow:2.9.2-python3.11
+
 USER root
-RUN apt-get update && apt-get install -y \
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libnss3 \
     libnspr4 \
@@ -16,10 +18,17 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libgbm1 \
     libasound2 \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
 USER airflow
-RUN pip install playwright && playwright install chromium
+
+COPY requirements.txt /tmp/requirements.txt
+
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && playwright install chromium
+
 USER root
+
 RUN /home/airflow/.local/bin/playwright install-deps chromium
+
 USER airflow
