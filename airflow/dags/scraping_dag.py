@@ -1,16 +1,18 @@
 from datetime import datetime, timedelta
 from airflow.decorators import dag, task # type: ignore (car le Docker tourne sur le conteneur)
+from notifications import task_failure_alert
 
 default_args = {
     "owner": "data-eng",
     "retries": 0,
     "retry_delay": timedelta(minutes=5),
+    "on_failure_callback": task_failure_alert,
 }
 
 @dag(
     dag_id="scraping_reviews_weekly",
     description="Scraping Trustpilot + Google, transform et chargement dans ES",
-    schedule_interval="0 6 * * 1",
+    schedule="0 6 * * 1",
     start_date=datetime(2025, 10, 29),
     catchup=False,
     max_active_runs=1,
