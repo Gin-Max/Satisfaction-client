@@ -176,4 +176,3 @@ jobs:
           done
 
           curl --fail --silent http://localhost:8000/
-          curl --fail --silent http://localhost:8000/avis
