@@ -1,5 +1,9 @@
-from datetime import datetime, timedelta
-from airflow.decorators import dag, task # type: ignore (car le Docker tourne sur le conteneur)
+from datetime import datetime, timedelta, timezone
+
+from airflow.decorators import (  # type: ignore (car le Docker tourne sur le conteneur)
+    dag,
+    task,
+)
 from notifications import task_failure_alert
 
 default_args = {
@@ -13,7 +17,7 @@ default_args = {
     dag_id="scraping_reviews_weekly",
     description="Scraping Trustpilot + Google, transform et chargement dans ES",
     schedule="0 6 * * 1",
-    start_date=datetime(2025, 10, 29),
+    start_date=datetime(2025, 10, 29, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
@@ -52,13 +56,13 @@ def pipeline():
     @task()
     def load_trustpilot(tp_reviews: list):
         """Transform et charge les avis Trustpilot dans ES."""
-        from scraping.transform import transform
         from scraping.load import (
-            get_es_client,
-            create_index_if_not_exists,
-            load_to_elasticsearch,
             INDEX_NAME,
+            create_index_if_not_exists,
+            get_es_client,
+            load_to_elasticsearch,
         )
+        from scraping.transform import transform
         client = get_es_client()
         create_index_if_not_exists(client, INDEX_NAME)
         final = transform([], tp_reviews)
@@ -68,16 +72,16 @@ def pipeline():
     def load_google(google_reviews: list):
         """Charge les avis Google dans ES."""
         from scraping.load import (
-            get_es_client,
-            create_index_if_not_exists,
-            load_to_elasticsearch,
             INDEX_NAME,
+            create_index_if_not_exists,
+            get_es_client,
+            load_to_elasticsearch,
         )
         client = get_es_client()
         create_index_if_not_exists(client, INDEX_NAME)
         load_to_elasticsearch(google_reviews, client)
 
-    backfill_task = backfill_existing_reviews()
+    backfill_existing_reviews()
     tp = scrape_trustpilot()
     tp_enriched = enrich_trustpilot(tp)
     google = scrape_google()
