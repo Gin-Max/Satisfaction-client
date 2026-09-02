@@ -211,6 +211,59 @@ def get_stats_sentiments(source: str = None, date_from: str = None, date_to: str
         print(f"[ERREUR API] get_stats_sentiments: {err}")
         return {}
 
+#ml/thematique
+@st.cache_data(ttl=60)
+def get_stats_thematiques(source: str = None, store: str = None, date_from: str = None, date_to: str = None) -> dict:
+    """Récupère la répartition des thématiques depuis l'API FastAPI."""
+    params = {}
+    if source:
+        params["source"] = source
+    if store:
+        params["store"] = store
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+
+    try:
+        response = requests.get(f"{API_URL}/stats/thematiques", params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as err:
+        print(f"[ERREUR API] get_stats_thematiques: {err}")
+        return {}
+
+#ml croisement thématique sentiment
+@st.cache_data(ttl=60)
+def get_stats_thematiques_sentiments(
+    source: str = None,
+    store: str = None,
+    date_from: str = None,
+    date_to: str = None,
+) -> dict:
+    """Récupère le croisement thématique x sentiment depuis l'API."""
+    params = {}
+    if source:
+        params["source"] = source
+    if store:
+        params["store"] = store
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+
+    try:
+        response = requests.get(
+            f"{API_URL}/stats/thematiques-sentiments",
+            params=params,
+            timeout=10,
+        )
+        return response.json() if response.status_code == 200 else {}
+    except Exception as err:
+        print(f"[ERREUR API] get_stats_thematiques_sentiments: {err}")
+        return {}
+
 STAR_COLORS = {
     1: "#e74c3c",
     2: "#e67e22",
@@ -350,6 +403,71 @@ if page == "📊 Trustpilot":
         else:
             st.info("Aucune donnée disponible.")
 
+    st.subheader(" Répartition par thématique prédite")
+    theme_data = get_stats_thematiques(source="trustpilot",date_from=df_str,date_to=dt_str,)
+    themes = theme_data.get("thematiques", [])
+
+    if themes:
+        df_themes = pd.DataFrame(themes).sort_values("count", ascending=True)
+        fig_theme = px.bar(
+            df_themes,
+            x="count",
+            y="thematique",
+            orientation="h",
+            labels={"count": "Nombre d'avis", "thematique": "Thématique"},
+            text="count",
+            color_discrete_sequence=["#2980b9"],
+        )
+        fig_theme.update_traces(textposition="outside")
+        fig_theme.update_layout(
+            margin=dict(t=20, b=20, l=10, r=10),
+            xaxis_title="Nombre d'avis",
+            yaxis_title="",
+        )
+        st.plotly_chart(fig_theme, width="stretch")
+    else:
+        st.info("Aucune donnée thématique disponible.")
+    st.markdown("---")
+
+    # Matrice Thématique x Sentiment
+    st.subheader("Taux de satisfaction par thématique")
+    matrice_data = get_stats_thematiques_sentiments(
+        source="trustpilot",
+        date_from=df_str,
+        date_to=dt_str,
+    )
+    items_matrice = matrice_data.get("matrice", [])
+
+    if items_matrice:
+        df_mat = pd.DataFrame(items_matrice)
+        fig_mat = px.bar(
+            df_mat,
+            x="pourcentage",
+            y="thematique",
+            color="sentiment",
+            orientation="h",
+            labels={
+                "pourcentage": "Proportion (%)",
+                "thematique": "Thématique",
+                "sentiment": "Sentiment",
+            },
+            text=df_mat["pourcentage"].apply(lambda v: f"{v}%"),
+            color_discrete_map={
+                "Positif": "#27ae60",
+                "Négatif": "#e74c3c",
+                "Neutre": "#95a5a6",
+            },
+        )
+        fig_mat.update_layout(
+            barmode="stack",
+            xaxis=dict(range=[0, 100]),
+            margin=dict(t=20, b=20, l=10, r=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_mat, width="stretch")
+    else:
+        st.info("Données croisées indisponibles.")
+
     st.markdown("---")
 
     # derniers avis
@@ -377,6 +495,33 @@ if page == "📊 Trustpilot":
 # Google
 elif page == "🗺️ Google":
     st.title("🗺️ Avis Google – Agences LDLC")
+    st.markdown("---")
+
+    # KPIs globaux Google enrichis avec les sentiments ML
+    note_data = get_note_moyenne("google")
+    note_moy = note_data.get("moyenne", 0)
+    total = note_data.get("total_avis", 0)
+
+    sent_data = get_stats_sentiments(source="google")
+    sent_list = sent_data.get("sentiments", [])
+
+    pct_positif = 0.0
+    pct_negatif = 0.0
+
+    for item in sent_list:
+        sentiment_nom = str(item.get("sentiment", "")).lower()
+        if "positif" in sentiment_nom:
+            pct_positif = float(item.get("pourcentage", 0.0))
+        elif "négatif" in sentiment_nom or "negatif" in sentiment_nom:
+            pct_negatif = float(item.get("pourcentage", 0.0))
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("⭐ Note moyenne", f"{note_moy:.2f} / 5" if note_moy else "–")
+    k1_total = f"{total:,}".replace(",", " ") if total else "–"
+    k2.metric("💬 Total avis", k1_total)
+    k3.metric("😊 Avis positifs", f"{pct_positif:.1f} %" if sent_list else "–")
+    k4.metric("😡 Avis négatifs", f"{pct_negatif:.1f} %" if sent_list else "–")
+
     st.markdown("---")
 
     stores_data = get_google_stores()
@@ -413,24 +558,36 @@ elif page == "🗺️ Google":
     # carte
     st.subheader("Carte des agences")
 
-    fig_map = px.scatter_mapbox(
-        df_map,
-        lat="lat",
-        lon="lon",
-        hover_name="store",
-        hover_data={"note_moyenne": True, "nb_avis": True, "lat": False, "lon": False},
-        color="note_moyenne",
-        color_continuous_scale=["#e74c3c", "#f1c40f", "#27ae60"],
-        range_color=[1, 5],
-        size="nb_avis",
-        size_max=20,
-        zoom=5,
-        center={"lat": 46.8, "lon": 2.3},
-        mapbox_style="open-street-map",
-        labels={"note_moyenne": "Note moy.", "nb_avis": "Nb avis"},
+    map_func = getattr(px, "scatter_map", getattr(px, "scatter_mapbox", None))
+    style_param = (
+        "map_style" if hasattr(px, "scatter_map") else "mapbox_style"
     )
+
+    map_kwargs = {
+        "data_frame": df_map,
+        "lat": "lat",
+        "lon": "lon",
+        "hover_name": "store",
+        "hover_data": {
+            "note_moyenne": True,
+            "nb_avis": True,
+            "lat": False,
+            "lon": False,
+        },
+        "color": "note_moyenne",
+        "color_continuous_scale": ["#e74c3c", "#f1c40f", "#27ae60"],
+        "range_color": [1, 5],
+        "size": "nb_avis",
+        "size_max": 20,
+        "zoom": 5,
+        "center": {"lat": 46.8, "lon": 2.3},
+        style_param: "open-street-map",
+        "labels": {"note_moyenne": "Note moy.", "nb_avis": "Nb avis"},
+    }
+
+    fig_map = map_func(**map_kwargs)
     fig_map.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0}, height=500)
-    st.plotly_chart(fig_map, use_container_width=True)
+    st.plotly_chart(fig_map, width="stretch")
 
     st.markdown("---")
 
@@ -476,3 +633,81 @@ elif page == "🗺️ Google":
                         st.info(f"💬 Réponse : {avis.get('reply_message', '')}")
         else:
             st.warning("Aucun avis disponible.")
+
+    st.markdown("---")
+
+    # Thématiques pour l'agence sélectionnée
+    st.subheader(f"Thématiques dominantes – {selected_store}")
+    store_theme_data = get_stats_thematiques(
+        source="google", store=selected_store
+    )
+    store_themes = store_theme_data.get("thematiques", [])
+
+    if store_themes:
+        df_store_themes = pd.DataFrame(store_themes).sort_values(
+            "count", ascending=True
+        )
+        fig_st_theme = px.bar(
+            df_store_themes,
+            x="count",
+            y="thematique",
+            orientation="h",
+            labels={"count": "Nombre d'avis", "thematique": "Thématique"},
+            text="count",
+            color_discrete_sequence=["#16a085"],
+        )
+        fig_st_theme.update_traces(textposition="outside")
+        fig_st_theme.update_layout(
+            margin=dict(t=20, b=20, l=10, r=10),
+            xaxis_title="Nombre d'avis",
+            yaxis_title="",
+        )
+        st.plotly_chart(fig_st_theme, width="stretch")
+    else:
+        st.info("Aucune thématique enregistrée pour cette agence.")
+
+    st.markdown("---")
+    
+    # Matrice Thématique x Sentiment pour l'agence Google sélectionnée
+    st.subheader(f"Taux de satisfaction par thématique – {selected_store}")
+    store_matrice_data = get_stats_thematiques_sentiments(
+        source="google",
+        store=selected_store,
+    )
+    store_matrice_items = store_matrice_data.get("matrice", [])
+
+    if store_matrice_items:
+        df_store_mat = pd.DataFrame(store_matrice_items)
+        fig_store_mat = px.bar(
+            df_store_mat,
+            x="pourcentage",
+            y="thematique",
+            color="sentiment",
+            orientation="h",
+            labels={
+                "pourcentage": "Proportion (%)",
+                "thematique": "Thématique",
+                "sentiment": "Sentiment",
+            },
+            text=df_store_mat["pourcentage"].apply(lambda v: f"{v}%"),
+            color_discrete_map={
+                "Positif": "#27ae60",
+                "Négatif": "#e74c3c",
+                "Neutre": "#95a5a6",
+            },
+        )
+        fig_store_mat.update_layout(
+            barmode="stack",
+            xaxis=dict(range=[0, 100]),
+            margin=dict(t=20, b=20, l=10, r=10),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+            ),
+        )
+        st.plotly_chart(fig_store_mat, width="stretch")
+    else:
+        st.info("Données croisées indisponibles pour cette agence.")

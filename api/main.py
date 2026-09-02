@@ -319,3 +319,115 @@ def get_stats_sentiments(
             for b in buckets
         ],
     }
+
+@app.get("/stats/thematiques")
+def get_stats_thematiques(
+    source: Optional[str] = None,
+    store: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """Calcule la répartition par thématique avec support du filtre par agence/store."""
+    filters = build_filters(source, date_from, date_to)
+
+    # Ajout du filtre par magasin si spécifié
+    if store:
+        filters.append({"match_phrase": {"store": store}})
+
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
+
+    result = es.search(
+        index="reviews",
+        body={
+            "size": 0,
+            "query": query,
+            "aggs": {
+                "par_thematique": {
+                    "terms": {
+                        "script": {
+                            "source": "params._source.thematique_predite"
+                        },
+                        "size": 15,
+                    }
+                }
+            },
+        },
+    )
+
+    buckets = (
+        result.get("aggregations", {})
+        .get("par_thematique", {})
+        .get("buckets", [])
+    )
+    return {
+        "thematiques": [
+            {
+                "thematique": str(b["key"]).strip().capitalize(),
+                "count": b["doc_count"],
+            }
+            for b in buckets
+            if b["key"]
+        ]
+    }
+
+@app.get("/stats/thematiques-sentiments")
+def get_stats_thematiques_sentiments(
+    source: Optional[str] = None,
+    store: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """Calcule la répartition des sentiments pour chaque thématique."""
+    filters = build_filters(source, date_from, date_to)
+    if store:
+        filters.append({"match_phrase": {"store": store}})
+
+    query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
+
+    result = es.search(
+        index="reviews",
+        body={
+            "size": 0,
+            "query": query,
+            "aggs": {
+                "par_thematique": {
+                    "terms": {
+                        "script": {"source": "params._source.thematique_predite"},
+                        "size": 10,
+                    },
+                    "aggs": {
+                        "par_sentiment": {
+                            "terms": {"field": "sentiment_predit", "size": 5}
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    data = []
+    buckets_theme = (
+        result.get("aggregations", {})
+        .get("par_thematique", {})
+        .get("buckets", [])
+    )
+
+    for b_theme in buckets_theme:
+        theme_nom = str(b_theme["key"]).strip().capitalize()
+        if not theme_nom:
+            continue
+
+        sent_buckets = b_theme.get("par_sentiment", {}).get("buckets", [])
+        total_theme = b_theme["doc_count"]
+
+        for b_sent in sent_buckets:
+            sent_label = str(b_sent["key"]).strip().capitalize()
+            count = b_sent["doc_count"]
+            data.append({
+                "thematique": theme_nom,
+                "sentiment": sent_label,
+                "count": count,
+                "pourcentage": round(count / total_theme * 100, 1) if total_theme > 0 else 0,
+            })
+
+    return {"matrice": data}
