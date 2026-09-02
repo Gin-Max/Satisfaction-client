@@ -142,37 +142,47 @@ jobs:
             satisfaction-client-airflow:ci \
             -m pytest tests/test_dags.py -v
 
-  api-healthcheck:
-    name: Healthcheck API
+  api-integration:
+    name: Tests intégration API
     runs-on: ubuntu-latest
 
     steps:
       - name: Récupération du code
         uses: actions/checkout@v4
 
-      - name: Mise en place de Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Démarrage d'Elasticsearch
+        run: docker compose up -d elasticsearch
 
-      - name: Construction de l'image API
-        uses: docker/build-push-action@v6
-        with:
-          context: ./api
-          load: true
-          push: false
-          tags: satisfaction-client-api:ci
-
-      - name: Vérification du démarrage de l'API
+      - name: Attente d'Elasticsearch
         run: |
-          docker run -d \
-            --name satisfaction-client-api \
-            -p 8000:8000 \
-            satisfaction-client-api:ci
-
           for i in {1..30}; do
-            if curl --fail --silent http://localhost:8000/; then
-              break
+            if curl --fail --silent http://localhost:9200/_cluster/health; then
+              exit 0
             fi
             sleep 2
           done
+          docker compose logs elasticsearch
+          exit 1
 
+      - name: Démarrage de l'API
+        run: docker compose up -d api
+
+      - name: Attente de l'API
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:8000/; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs api
+          exit 1
+
+      - name: Vérification des endpoints API
+        run: |
           curl --fail --silent http://localhost:8000/
+          curl --fail --silent http://localhost:8000/avis
+
+      - name: Arrêt des services
+        if: always()
+        run: docker compose down
