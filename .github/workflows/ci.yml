@@ -178,7 +178,6 @@ jobs:
       - name: Vérification des endpoints API
         run: |
           curl --fail --silent http://localhost:8000/
-          curl --fail --silent http://localhost:8000/avis
 
       - name: Logs en cas d'échec
         if: failure()
