@@ -170,10 +170,10 @@ jobs:
 
           for i in {1..30}; do
             if curl --fail --silent http://localhost:8000/; then
-              exit 0
+              break
             fi
             sleep 2
           done
 
-          docker logs satisfaction-client-api
-          exit 1
+          curl --fail --silent http://localhost:8000/
+          curl --fail --silent http://localhost:8000/avis
