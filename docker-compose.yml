@@ -92,6 +92,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
       PYTHONPATH: /opt/airflow/project
       ELASTIC_HOST: http://elasticsearch:9200
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       AIRFLOW__METRICS__STATSD_ON: "True"
       AIRFLOW__METRICS__STATSD_HOST: statsd-exporter
       AIRFLOW__METRICS__STATSD_PORT: 9125
@@ -133,6 +134,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/requirements.txt"
       PYTHONPATH: /opt/airflow/project
       ELASTIC_HOST: http://elasticsearch:9200
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       AIRFLOW__METRICS__STATSD_ON: "True"
       AIRFLOW__METRICS__STATSD_HOST: statsd-exporter
       AIRFLOW__METRICS__STATSD_PORT: 9125

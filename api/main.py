@@ -1,9 +1,20 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from elasticsearch import Elasticsearch
-#from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator import Instrumentator
 from typing import Optional
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Instrument the FastAPI app for Prometheus
+Instrumentator().instrument(app).expose(app)
 
 def build_filters(source: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> list:
     filters = []
@@ -265,5 +276,6 @@ def get_google_store_reviews(store: str, limit: int = 10):
             {"term": {"source": "google"}},
             {"term": {"store": store}}
         ]}},
+        "sort": [{"published_date": {"order": "desc"}}]
     })
     return [hit["_source"] for hit in result["hits"]["hits"]]
