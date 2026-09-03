@@ -225,7 +225,7 @@ def get_google_stores():
         "query": {"term": {"source": "google"}},
         "aggs": {
             "par_store": {
-                "terms": {"field": "store", "size": 100},
+                "terms": {"field": "store.keyword", "size": 100},
                 "aggs": {
                     "note_moyenne": {"avg": {"field": "rating"}},
                 }
@@ -250,7 +250,7 @@ def get_google_store_distribution(store: str):
         "size": 0,
         "query": {"bool": {"filter": [
             {"term": {"source": "google"}},
-            {"term": {"store": store}}
+            {"term": {"store.keyword": store}}
         ]}},
         "aggs": {
             "par_note": {
@@ -274,7 +274,7 @@ def get_google_store_reviews(store: str, limit: int = 10):
         "size": limit,
         "query": {"bool": {"filter": [
             {"term": {"source": "google"}},
-            {"term": {"store": store}}
+            {"term": {"store.keyword": store}}
         ]}},
         "sort": [{"published_date": {"order": "desc"}}]
     })
@@ -431,3 +431,98 @@ def get_stats_thematiques_sentiments(
             })
 
     return {"matrice": data}
+
+@app.get("/export/avis")
+def export_avis(
+    source: Optional[str] = None,
+    store: Optional[str] = None,
+    rating: Optional[int] = None,
+    sentiment: Optional[str] = None,
+    thematique: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 10000,
+):
+    """Exporte les avis bruts selon les filtres actifs pour le téléchargement CSV."""
+    must_conditions = []
+
+    # 1. Filtre sur la source (recherche tolérante sur les libellés réels)
+    if source:
+        src = source.strip().lower()
+        if "trustpilot" in src:
+            must_conditions.append(
+                {
+                    "bool": {
+                        "should": [
+                            {"match": {"source": "trustpilot"}},
+                            {"match": {"source": "BasicLink"}},
+                            {"match": {"review_source_name": "BasicLink"}},
+                            {"match": {"source": "Organic"}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                }
+            )
+        elif "google" in src:
+            must_conditions.append({"match": {"source": "google"}})
+
+    # 2. Filtres optionnels
+    if rating is not None:
+        must_conditions.append({"term": {"rating": rating}})
+
+    if sentiment:
+        must_conditions.append({"match": {"sentiment_predit": sentiment}})
+
+    if store:
+        must_conditions.append({"match_phrase": {"store": store}})
+
+    if thematique:
+        must_conditions.append(
+            {"match_phrase": {"thematique_predite": thematique}}
+        )
+
+    # 3. Filtre chronologique sur published_date
+    if date_from or date_to:
+        date_range = {}
+        if date_from:
+            date_range["gte"] = date_from
+        if date_to:
+            date_range["lte"] = date_to
+        must_conditions.append({"range": {"published_date": date_range}})
+
+    query_body = (
+        {"bool": {"must": must_conditions}}
+        if must_conditions
+        else {"match_all": {}}
+    )
+
+    res = es.search(
+        index="reviews",
+        size=limit,
+        query=query_body,
+        _source=[
+            "published_date",
+            "rating",
+            "author_name",
+            "store",
+            "text",
+            "reply_message",
+        ],
+    )
+
+    hits = res.get("hits", {}).get("hits", [])
+    data = []
+    for h in hits:
+        src = h.get("_source", {})
+        data.append(
+            {
+                "Date de publication": str(src.get("published_date", ""))[:10],
+                "Note": src.get("rating", ""),
+                "Auteur": src.get("author_name", "Anonyme"),
+                "Agence": src.get("store", "LDLC Web"),
+                "Commentaire": src.get("text", ""),
+                "Réponse service client": src.get("reply_message", ""),
+            }
+        )
+
+    return {"total": len(data), "avis": data}

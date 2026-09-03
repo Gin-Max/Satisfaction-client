@@ -264,6 +264,93 @@ def get_stats_thematiques_sentiments(
         print(f"[ERREUR API] get_stats_thematiques_sentiments: {err}")
         return {}
 
+@st.cache_data(ttl=60)
+def get_avis_export(
+    source: str = None,
+    store: str = None,
+    rating: int = None,
+    sentiment: str = None,
+    thematique: str = None,
+    date_from: str = None,
+    date_to: str = None,
+) -> list:
+    """Récupère jusqu'à 10 000 avis selon les critères cliqués."""
+    params = {"limit": 10000}
+    if source:
+        params["source"] = source
+    if store:
+        params["store"] = store
+    if rating is not None:
+        params["rating"] = rating
+    if sentiment:
+        params["sentiment"] = sentiment
+    if thematique:
+        params["thematique"] = thematique
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+
+    try:
+        response = requests.get(
+            f"{API_URL}/export/avis", params=params, timeout=20
+        )
+        if response.status_code == 200:
+            return response.json().get("avis", [])
+        return []
+    except Exception as err:
+        print(f"[ERREUR API EXPORT] : {err}")
+        return []
+
+
+def gerer_export_graphique(
+    event: dict,
+    type_filtre: str,
+    source: str,
+    store: str = None,
+    date_from: str = None,
+    date_to: str = None,
+    cle_unique: str = "export",
+):
+    """Affiche uniquement le bouton de téléchargement au clic sur un graphique."""
+    points = event.get("selection", {}).get("points", [])
+    if not points:
+        return
+
+    pt = points[0]
+    rating = None
+    thematique = None
+    sentiment = None
+
+    # Extraction automatique de la valeur cliquée
+    if type_filtre == "rating":
+        rating = int(pt.get("x"))
+    elif type_filtre == "thematique":
+        thematique = str(pt.get("y", pt.get("x")))
+    elif type_filtre == "sentiment":
+        sentiment = str(pt.get("x", pt.get("y")))
+
+    avis_data = get_avis_export(
+        source=source,
+        store=store,
+        rating=rating,
+        sentiment=sentiment,
+        thematique=thematique,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    if avis_data:
+        df_csv = pd.DataFrame(avis_data)
+        csv_bytes = df_csv.to_csv(index=False, sep=";").encode("utf-8-sig")
+        st.download_button(
+            label=f"Télécharger les avis filtrés (CSV)",
+            data=csv_bytes,
+            file_name=f"export_{source}_{cle_unique}.csv",
+            mime="text/csv",
+            key=f"btn_{cle_unique}",
+        )
+
 STAR_COLORS = {
     1: "#e74c3c",
     2: "#e67e22",
@@ -318,10 +405,30 @@ if page == "📊 Trustpilot":
 
     # dates
     col_d1, col_d2, col_d3 = st.columns([2, 2, 4])
+    # Définition explicite des bornes temporelles autorisées
+    borne_min = (
+        date(2010, 1, 1)
+        if "date_min" not in locals() or date_min is None
+        else date_min
+    )
+    borne_max = date.today()
+
     with col_d1:
-        date_from = st.date_input("Du", value=date_min, key="tp_from")
+        date_from = st.date_input(
+            "Du",
+            value=borne_min,
+            min_value=borne_min,
+            max_value=borne_max,
+            key="tp_from",
+        )
     with col_d2:
-        date_to = st.date_input("Au", value=date.today(), key="tp_to")
+        date_to = st.date_input(
+            "Au",
+            value=borne_max,
+            min_value=borne_min,
+            max_value=borne_max,
+            key="tp_to",
+        )
 
     df_str = date_from.isoformat()
     dt_str = date_to.isoformat()
@@ -378,9 +485,29 @@ if page == "📊 Trustpilot":
                 labels={"note": "Note", "count": "Nombre d'avis"},
                 text="count",
             )
-            fig.update_layout(showlegend=False, xaxis=dict(tickmode="linear", dtick=1))
+            fig.update_layout(
+                showlegend=False, xaxis=dict(tickmode="linear", dtick=1)
+            )
             fig.update_traces(textposition="outside")
-            st.plotly_chart(fig, use_container_width=True)
+
+            # 1. Affichage du graphique avec capture du clic
+            event_notes = st.plotly_chart(
+                fig,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key="chart_notes_trustpilot",
+            )
+
+            # 2. Gestion automatique du téléchargement au clic (sans texte parasite)
+            gerer_export_graphique(
+                event=event_notes,
+                type_filtre="rating",
+                source="trustpilot",
+                date_from=df_str,
+                date_to=dt_str,
+                cle_unique="tp_notes",
+            )
         else:
             st.info("Aucune donnée disponible.")
 
@@ -403,8 +530,13 @@ if page == "📊 Trustpilot":
         else:
             st.info("Aucune donnée disponible.")
 
+
     st.subheader(" Répartition par thématique prédite")
-    theme_data = get_stats_thematiques(source="trustpilot",date_from=df_str,date_to=dt_str,)
+    theme_data = get_stats_thematiques(
+        source="trustpilot",
+        date_from=df_str,
+        date_to=dt_str,
+    )
     themes = theme_data.get("thematiques", [])
 
     if themes:
@@ -424,9 +556,26 @@ if page == "📊 Trustpilot":
             xaxis_title="Nombre d'avis",
             yaxis_title="",
         )
-        st.plotly_chart(fig_theme, width="stretch")
+
+        # 1. Capture du clic sur le graphique des thématiques Trustpilot
+        event_tp_themes = st.plotly_chart(
+            fig_theme,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="points",
+            key="chart_tp_thematiques",
+        )
+        gerer_export_graphique(
+            event=event_tp_themes,
+            type_filtre="thematique",
+            source="trustpilot",
+            date_from=df_str,
+            date_to=dt_str,
+            cle_unique="tp_thematiques",
+        )
     else:
         st.info("Aucune donnée thématique disponible.")
+
     st.markdown("---")
 
     # Matrice Thématique x Sentiment
@@ -462,9 +611,31 @@ if page == "📊 Trustpilot":
             barmode="stack",
             xaxis=dict(range=[0, 100]),
             margin=dict(t=20, b=20, l=10, r=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+            ),
         )
-        st.plotly_chart(fig_mat, width="stretch")
+
+        # 2. Capture du clic sur la matrice Trustpilot
+        event_tp_matrice = st.plotly_chart(
+            fig_mat,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="points",
+            key="chart_tp_matrice",
+        )
+        gerer_export_graphique(
+            event=event_tp_matrice,
+            type_filtre="matrice",
+            source="trustpilot",
+            date_from=df_str,
+            date_to=dt_str,
+            cle_unique="tp_matrice",
+        )
     else:
         st.info("Données croisées indisponibles.")
 
@@ -616,7 +787,22 @@ elif page == "🗺️ Google":
                 color_continuous_scale="RdYlGn",
             )
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+
+            # 1. Capture du clic sur la distribution Google
+            event_gg_notes = st.plotly_chart(
+                fig,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key=f"chart_gg_notes_{selected_store}",
+            )
+            gerer_export_graphique(
+                event=event_gg_notes,
+                type_filtre="rating",
+                source="google",
+                store=selected_store,
+                cle_unique=f"gg_notes_{selected_store}",
+            )
         else:
             st.warning("Données indisponibles")
 
@@ -662,7 +848,22 @@ elif page == "🗺️ Google":
             xaxis_title="Nombre d'avis",
             yaxis_title="",
         )
-        st.plotly_chart(fig_st_theme, width="stretch")
+
+        # 2. Capture du clic sur les thématiques de l'agence Google
+        event_gg_themes = st.plotly_chart(
+            fig_st_theme,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="points",
+            key=f"chart_gg_themes_{selected_store}",
+        )
+        gerer_export_graphique(
+            event=event_gg_themes,
+            type_filtre="thematique",
+            source="google",
+            store=selected_store,
+            cle_unique=f"gg_themes_{selected_store}",
+        )
     else:
         st.info("Aucune thématique enregistrée pour cette agence.")
 
@@ -708,6 +909,21 @@ elif page == "🗺️ Google":
                 x=1,
             ),
         )
-        st.plotly_chart(fig_store_mat, width="stretch")
+
+        # 3. Capture du clic sur la matrice Google
+        event_gg_matrice = st.plotly_chart(
+            fig_store_mat,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="points",
+            key=f"chart_gg_matrice_{selected_store}",
+        )
+        gerer_export_graphique(
+            event=event_gg_matrice,
+            type_filtre="matrice",
+            source="google",
+            store=selected_store,
+            cle_unique=f"gg_matrice_{selected_store}",
+        )
     else:
         st.info("Données croisées indisponibles pour cette agence.")
