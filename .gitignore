@@ -18,3 +18,5 @@ env/*.py[cod]
 *.py[cod]
 
 .env
+
+docs/
