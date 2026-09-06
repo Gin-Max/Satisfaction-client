@@ -166,6 +166,21 @@ services:
     volumes:
       - ./streamlit/cache:/app/cache
 
+  # MLOPS - MLFLOW TRACKING SERVER
+  mlflow:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_ALLOW_FILE_STORE=true
+    volumes:
+      - ./ml/mlruns:/ml/mlruns
+    restart: unless-stopped
+
+
   # MONITORING - PROMETHEUS
   prometheus:
     image: prom/prometheus:latest

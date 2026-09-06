@@ -13,6 +13,7 @@ from sklearn.metrics import classification_report, precision_score, recall_score
 # =====================================================================
 # 1. ENREGISTREMENT DE L'EXPÉRIENCE DANS MLFLOW
 # =====================================================================
+mlflow.set_tracking_uri("http://localhost:5000")
 mlflow.set_experiment("Analyse_Sentiment_LDLC")
 
 # =====================================================================

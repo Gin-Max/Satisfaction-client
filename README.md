@@ -22,6 +22,7 @@ docker-compose up -d --build
 | FastAPI Docs  | http://localhost:8000/docs | Documentation API       |
 | Airflow       | http://localhost:8080      | Dags Airflow            |
 | Streamlit     | http://localhost:8501      | Dashboard Streamlit     |
+| MLFlow        | http://localhost:5000      | MLFlow Experiments      |
 
 | Route                 | Description                           |
 | --------------------- | ------------------------------------- |
