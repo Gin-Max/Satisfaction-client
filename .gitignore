@@ -16,3 +16,7 @@ venv/
 .venv/
 env/*.py[cod]
 *.py[cod]
+
+.env
+
+docs/
