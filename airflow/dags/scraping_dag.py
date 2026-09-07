@@ -29,9 +29,20 @@ def pipeline():
     def init_ES():
         """Crée l'index Elasticsearch si nécessaire et charge l'historique
         Trustpilot/Google si aucune donnée n'est encore présente pour ces sources."""
-        from scraping.extract_google import is_google_empty, load_historical_google_reviews
-        from scraping.extract_trustpilot import is_trustpilot_empty, load_historical_reviews
-        from scraping.load import INDEX_NAME, create_index_if_not_exists, get_es_client, load_to_elasticsearch
+        from scraping.extract_google import (
+            is_google_empty,
+            load_historical_google_reviews,
+        )
+        from scraping.extract_trustpilot import (
+            is_trustpilot_empty,
+            load_historical_reviews,
+        )
+        from scraping.load import (
+            INDEX_NAME,
+            create_index_if_not_exists,
+            get_es_client,
+            load_to_elasticsearch,
+        )
         from scraping.transform import transform
 
         client = get_es_client()
