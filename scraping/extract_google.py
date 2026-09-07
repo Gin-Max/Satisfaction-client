@@ -96,7 +96,6 @@ def get_google_reviews_via_api(store_name, api_key):
 
         reviews = []
         for r in details_json['reviews']:
-            # L'API renvoie un timestamp strict, ex: 2024-05-12T08:50:15.237897993Z
             published_date = r.get('publishTime', '')
 
             author_name = ''
@@ -109,7 +108,7 @@ def get_google_reviews_via_api(store_name, api_key):
 
             rating = r.get('rating', 0)
 
-            # Construire un review_id basé sur l'auteur, le texte et le magasin (cohérent avec le format historique)
+            # Construire un review_id basé sur l'auteur, le texte et le magasin
             content = f"{author_name}|{text[:50]}|{store_name}".lower().strip()
             review_id = f"google_{hashlib.md5(content.encode()).hexdigest()[:12]}"
 
