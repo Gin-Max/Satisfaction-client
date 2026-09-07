@@ -12,7 +12,7 @@ import os
 import re
 from datetime import datetime, timedelta
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 JSON_FILE = os.path.join(DATA_DIR, "google_reviews.json")
 
 # Date du scraping original (commit du CSV)
@@ -68,13 +68,13 @@ def parse_relative_date(relative_date_str, reference_date):
             else:
                 value = int(match.group(1))
 
-            # Calculer la date et le format selon la précision
+            # Calculer la date et le format complet YYYY-MM-DD
             if unit == "year" or unit == "years":
                 result = reference_date - timedelta(days=value * 365)
-                return result.strftime("%Y")  # Juste l'année
+                return result.strftime("%Y-%m-%d")
             elif unit == "month" or unit == "months":
                 result = reference_date - timedelta(days=value * 30)
-                return result.strftime("%Y-%m")  # Année-mois
+                return result.strftime("%Y-%m-%d")
             elif unit == "week" or unit == "weeks":
                 result = reference_date - timedelta(weeks=value)
                 return result.strftime("%Y-%m-%d")
