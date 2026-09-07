@@ -2,21 +2,22 @@
 
 import os
 import re
-import pickle
+import joblib
 from typing import List, Dict, Any
 from elasticsearch.helpers import bulk
 from scraping.load import INDEX_NAME, get_es_client
 
 # -------------------------------------------------------------------------
-# 1. Chargement des modèles sérialisés de sentiment
+# 1. Chargement des modèles sérialisés de sentiment via joblib
 # -------------------------------------------------------------------------
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
-# Chemins possibles pour les fichiers .pkl
+# Chemins de recherche dans le conteneur Airflow et en local
 SEARCH_PATHS = [
-    os.path.join(CURRENT_DIR),
-    os.path.join(PROJECT_ROOT, "ml")
+    "/opt/airflow/project/ml",
+    CURRENT_DIR,
+    os.path.join(PROJECT_ROOT, "ml"),
 ]
 
 vectorizer = None
@@ -27,13 +28,15 @@ for path in SEARCH_PATHS:
     mod_path = os.path.join(path, "logistic_regression_model.pkl")
     if os.path.exists(vec_path) and os.path.exists(mod_path):
         try:
-            with open(vec_path, "rb") as f:
-                vectorizer = pickle.load(f)
-            with open(mod_path, "rb") as f:
-                sentiment_model = pickle.load(f)
+            vectorizer = joblib.load(vec_path)
+            sentiment_model = joblib.load(mod_path)
+            print(f"[INFO] Modèles de sentiment chargés avec succès depuis : {path}")
             break
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ERREUR] Échec du chargement depuis {path} : {e}")
+
+if vectorizer is None or sentiment_model is None:
+    print("[ATTENTION] Modèles non chargés. Les prédictions renverront 'Inconnu'.")
 
 # -------------------------------------------------------------------------
 # 2. Dictionnaire de règles Regex pour les thématiques
@@ -97,25 +100,33 @@ def predict_theme(text: str) -> str:
             return theme
     return "Autre"
 
+# Mappage des prédictions numériques Scikit-Learn vers des libellés explicites
+LABEL_MAPPING = {
+    1: "Positif",
+    0: "Négatif",
+    "1": "Positif",
+    "0": "Négatif",
+}
+
 def enrich_reviews(reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Ajoute sentiment_predit et thematique_predite à chaque dictionnaire d'avis."""
+    """Ajoute sentiment_predit ('Positif'/'Négatif') et thematique_predite à chaque avis."""
     if not reviews:
         return []
 
     texts = [str(r.get("text", "") or "") for r in reviews]
 
-    # Inférence du sentiment
     sentiments = []
     if vectorizer and sentiment_model and any(t.strip() for t in texts):
         try:
             features = vectorizer.transform(texts)
-            sentiments = sentiment_model.predict(features).tolist()
+            raw_predictions = sentiment_model.predict(features).tolist()
+            # Conversion explicite de chaque résultat numérique en libellé textuel
+            sentiments = [LABEL_MAPPING.get(p, "Inconnu") for p in raw_predictions]
         except Exception:
             sentiments = ["Inconnu"] * len(reviews)
     else:
         sentiments = ["Inconnu"] * len(reviews)
 
-    # Enrichissement unitaire
     enriched = []
     for i, review in enumerate(reviews):
         item = dict(review)
@@ -125,62 +136,57 @@ def enrich_reviews(reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     return enriched
 
-def backfill_unenriched_reviews(batch_size: int = 2000) -> int:
-    """Recherche tous les documents sans 'thematique_predite' dans Elasticsearch
-    et les enrichit par paquets successifs jusqu'à épuisement complet via l'API Scroll.
-    """
+def backfill_unenriched_reviews(batch_size: int = 1000) -> int:
+    """Met à jour les avis non enrichis ou marqués 'Inconnu'."""
     client = get_es_client()
 
-    # 1. Requête pour filtrer les documents n'ayant pas encore de thématique
-    query = {
-        "query": {
-            "bool": {
-                "must_not": {
-                    "exists": {"field": "thematique_predite"}
-                }
-            }
+    query_clause = {
+        "bool": {
+            "should": [
+                {"bool": {"must_not": {"exists": {"field": "thematique_predite"}}}},
+                {"term": {"sentiment_predit.keyword": "Inconnu"}},
+                {"term": {"sentiment_predit": "Inconnu"}},
+            ],
+            "minimum_should_match": 1,
         }
     }
 
-    # 2. Comptage initial
-    count_res = client.count(index=INDEX_NAME, body=query)
-    total_to_update = count_res.get("count", 0)
+    search_res = client.search(
+        index=INDEX_NAME,
+        query=query_clause,
+        size=batch_size,
+        scroll="10m",
+        request_timeout=60,
+        _source=["text", "title"]
+    )
+
+    total_hits_dict = search_res.get("hits", {}).get("total", {})
+    total_to_update = total_hits_dict.get("value", 0) if isinstance(total_hits_dict, dict) else total_hits_dict
 
     if total_to_update == 0:
         print(f"[INFO] Tous les documents de l'index '{INDEX_NAME}' sont déjà enrichis.")
         return 0
 
-    print(f"[INFO] {total_to_update} avis non enrichis trouvés. Lancement du rattrapage complet...")
-
-    # 3. Initialisation de la recherche Scroll (contexte ouvert pendant 5 minutes)
-    search_res = client.search(
-        index=INDEX_NAME,
-        body=query,
-        size=batch_size,
-        scroll="5m"
-    )
+    print(f"[INFO] {total_to_update} avis à traiter trouvés. Lancement du traitement...")
 
     scroll_id = search_res.get("_scroll_id")
-    hits = search_res["hits"]["hits"]
+    hits = search_res.get("hits", {}).get("hits", [])
     total_enriched = 0
 
     try:
-        # 4. Boucle tant qu'Elasticsearch renvoie des documents
         while hits:
             reviews_to_enrich = []
             doc_ids = []
 
             for hit in hits:
                 doc_ids.append(hit["_id"])
-                reviews_to_enrich.append(hit["_source"])
+                reviews_to_enrich.append(hit.get("_source", {}))
 
-            # Enrichissement du lot courant
             enriched_data = enrich_reviews(reviews_to_enrich)
 
-            # Préparation des opérations Bulk
             actions = []
             for doc_id, enriched_doc in zip(doc_ids, enriched_data):
-                action = {
+                actions.append({
                     "_op_type": "update",
                     "_index": INDEX_NAME,
                     "_id": doc_id,
@@ -188,27 +194,28 @@ def backfill_unenriched_reviews(batch_size: int = 2000) -> int:
                         "sentiment_predit": enriched_doc.get("sentiment_predit"),
                         "thematique_predite": enriched_doc.get("thematique_predite"),
                     },
-                }
-                actions.append(action)
+                })
 
-            # Envoi du lot dans Elasticsearch
             if actions:
-                success_count, _ = bulk(client, actions)
+                success_count, _ = bulk(
+                    client,
+                    actions,
+                    chunk_size=500,
+                    request_timeout=120
+                )
                 total_enriched += success_count
-                print(f"[PROGRESSION] {total_enriched} / {total_to_update} documents traités...")
+                print(f"[PROGRESSION] {total_enriched} / {total_to_update} documents mis à jour...")
 
-            # Récupération du lot suivant avec le scroll_id
-            scroll_res = client.scroll(scroll_id=scroll_id, scroll="5m")
+            scroll_res = client.scroll(scroll_id=scroll_id, scroll="10m", request_timeout=60)
             scroll_id = scroll_res.get("_scroll_id")
-            hits = scroll_res["hits"]["hits"]
+            hits = scroll_res.get("hits", {}).get("hits", [])
 
     finally:
-        # 5. Nettoyage du curseur Scroll côté Elasticsearch pour libérer la mémoire du serveur
         if scroll_id:
             try:
-                client.clear_scroll(scroll_id=scroll_id)
+                client.clear_scroll(scroll_id=scroll_id, request_timeout=30)
             except Exception:
                 pass
 
-    print(f"[SUCCÈS] Rattrapage terminé : {total_enriched} documents historiques ont été enrichis.")
+    print(f"[SUCCÈS] Enrichissement terminé : {total_enriched} avis mis à jour avec succès.")
     return total_enriched

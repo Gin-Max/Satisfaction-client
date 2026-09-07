@@ -297,16 +297,35 @@ def get_google_store_reviews(store: str, limit: int = 10):
     })
     return [pseudonymize_doc(hit["_source"]) for hit in result["hits"]["hits"]]
 
+# Dictionnaire de normalisation pour gérer toutes les variantes de casse
+LABEL_MAP = {
+    "positif": "Positif",
+    "Positif": "Positif",
+    "négatif": "Négatif",
+    "Négatif": "Négatif",
+    "negatif": "Négatif",
+    "Negatif": "Négatif",
+    "1": "Positif",
+    1: "Positif",
+    "0": "Négatif",
+    0: "Négatif",
+}
+
 @app.get("/stats/sentiments")
 def get_stats_sentiments(
     source: Optional[str] = None,
+    store: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ):
-    """Calcule la répartition des sentiments prédits (positif, neutre, négatif)."""
+    """Calcule la repartition globale ou par agence des avis positifs et negatifs."""
     filters = build_filters(source, date_from, date_to)
+    if store:
+        filters.append({"match_phrase": {"store": store}})
+
     query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
 
+    # Ciblage obligatoire de .keyword pour agreger sur un champ texte
     result = es.search(
         index="reviews",
         body={
@@ -314,26 +333,33 @@ def get_stats_sentiments(
             "query": query,
             "aggs": {
                 "par_sentiment": {
-                    "terms": {"field": "sentiment_predit", "size": 5}
+                    "terms": {"field": "sentiment_predit.keyword", "size": 10}
                 }
             },
         },
     )
 
-    buckets = result["aggregations"]["par_sentiment"]["buckets"]
+    buckets = result.get("aggregations", {}).get("par_sentiment", {}).get("buckets", [])
     total = sum(b["doc_count"] for b in buckets)
+
+    comptes = {"Positif": 0, "Négatif": 0}
+    for b in buckets:
+        raw_val = str(b["key"]).strip()
+        label = LABEL_MAP.get(raw_val, raw_val.capitalize())
+        if label in comptes:
+            comptes[label] += b["doc_count"]
+        else:
+            comptes[label] = b["doc_count"]
 
     return {
         "total": total,
         "sentiments": [
             {
-                "sentiment": b["key"],
-                "count": b["doc_count"],
-                "pourcentage": round(b["doc_count"] / total * 100, 1)
-                if total > 0
-                else 0,
+                "sentiment": label,
+                "count": count,
+                "pourcentage": round(count / total * 100, 1) if total > 0 else 0.0,
             }
-            for b in buckets
+            for label, count in comptes.items()
         ],
     }
 
@@ -394,7 +420,7 @@ def get_stats_thematiques_sentiments(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ):
-    """Calcule la répartition des sentiments pour chaque thématique."""
+    """Calcule la repartition des sentiments par thematique pour le tableau de bord."""
     filters = build_filters(source, date_from, date_to)
     if store:
         filters.append({"match_phrase": {"store": store}})
@@ -410,11 +436,12 @@ def get_stats_thematiques_sentiments(
                 "par_thematique": {
                     "terms": {
                         "script": {"source": "params._source.thematique_predite"},
-                        "size": 10,
+                        "size": 15,
                     },
                     "aggs": {
                         "par_sentiment": {
-                            "terms": {"field": "sentiment_predit", "size": 5}
+                            # Sous-agregation sur .keyword
+                            "terms": {"field": "sentiment_predit.keyword", "size": 5}
                         }
                     },
                 }
@@ -431,20 +458,24 @@ def get_stats_thematiques_sentiments(
 
     for b_theme in buckets_theme:
         theme_nom = str(b_theme["key"]).strip().capitalize()
-        if not theme_nom:
+        if not theme_nom or theme_nom.lower() in ["none", "null"]:
             continue
 
-        sent_buckets = b_theme.get("par_sentiment", {}).get("buckets", [])
         total_theme = b_theme["doc_count"]
+        sent_buckets = b_theme.get("par_sentiment", {}).get("buckets", [])
 
+        sent_comptes = {}
         for b_sent in sent_buckets:
-            sent_label = str(b_sent["key"]).strip().capitalize()
-            count = b_sent["doc_count"]
+            raw_key = str(b_sent["key"]).strip()
+            label = LABEL_MAP.get(raw_key, raw_key.capitalize())
+            sent_comptes[label] = sent_comptes.get(label, 0) + b_sent["doc_count"]
+
+        for sent_label, count in sent_comptes.items():
             data.append({
                 "thematique": theme_nom,
                 "sentiment": sent_label,
                 "count": count,
-                "pourcentage": round(count / total_theme * 100, 1) if total_theme > 0 else 0,
+                "pourcentage": round(count / total_theme * 100, 1) if total_theme > 0 else 0.0,
             })
 
     return {"matrice": data}
@@ -488,7 +519,7 @@ def export_avis(
         must_conditions.append({"term": {"rating": rating}})
 
     if sentiment:
-        must_conditions.append({"match": {"sentiment_predit": sentiment}})
+        must_conditions.append({"term": {"sentiment_predit.keyword": sentiment}})
 
     if store:
         must_conditions.append({"match_phrase": {"store": store}})
