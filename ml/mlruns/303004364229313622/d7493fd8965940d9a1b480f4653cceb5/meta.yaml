@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/303004364229313622/d7493fd8965940d9a1b480f4653cceb5/artifacts
+end_time: 1788692892057
+entry_point_name: ''
+experiment_id: '303004364229313622'
+lifecycle_stage: active
+run_id: d7493fd8965940d9a1b480f4653cceb5
+run_name: Baseline_TFIDF_LogReg
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1788692876774
+status: 3
+tags: []
+user_id: issab
