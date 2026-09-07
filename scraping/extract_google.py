@@ -40,17 +40,17 @@ def get_stores_list():
     headers = {'User-Agent': 'Mozilla/5.0'}
     response = requests.get(url, headers=headers)
     log(f"Status code: {response.status_code}")
-    
+
     soup = BeautifulSoup(response.text, 'html.parser')
     stores = []
-    
+
     # Trouver tous les liens
     for a in soup.find_all('a', href=True):
         if '/magasins-ldlc/magasin-' in a['href'] and a.text.strip():
             store_name = a.text.strip()
             if store_name not in stores:
                 stores.append(store_name)
-                
+
     log(f"{len(stores)} magasins trouvés.")
     return stores
 
@@ -68,17 +68,17 @@ def get_google_reviews_via_api(store_name, api_key):
     search_data = {
         'textQuery': f'LDLC {store_name}'
     }
-    
+
     try:
         search_resp = requests.post(search_url, headers=search_headers, json=search_data)
         search_json = search_resp.json()
-        
+
         if 'places' not in search_json or not search_json['places']:
             log(f"  Aucun lieu trouvé sur Google Maps pour LDLC {store_name}.")
             return []
-            
+
         place_id = search_json['places'][0]['id']
-        
+
         # 2. Place Details pour récupérer les avis
         details_url = f'https://places.googleapis.com/v1/places/{place_id}'
         details_headers = {
@@ -86,38 +86,33 @@ def get_google_reviews_via_api(store_name, api_key):
             'X-Goog-FieldMask': 'id,displayName,reviews',
             'Accept-Language': 'fr'
         }
-        
+
         details_resp = requests.get(details_url, headers=details_headers)
         details_json = details_resp.json()
-        
+
         if 'reviews' not in details_json:
             log("  Aucun avis trouvé.")
             return []
-            
+
         reviews = []
         for r in details_json['reviews']:
             # L'API renvoie un timestamp strict, ex: 2024-05-12T08:50:15.237897993Z
             published_date = r.get('publishTime', '')
-            
+
             author_name = ''
             if 'authorAttribution' in r and 'displayName' in r['authorAttribution']:
                 author_name = r['authorAttribution']['displayName']
-                
+
             text = ''
             if 'text' in r and 'text' in r['text']:
                 text = r['text']['text']
-                
+
             rating = r.get('rating', 0)
-            
-<<<<<<< HEAD
-            # Construire un review_id basé sur l'auteur et la date pour Elasticsearch (clé d'unicité)
-            review_id = f"{author_name}|{text[:50]}|{store_name}".lower().strip()
-=======
-            # Construire un review_id basé sur l'auteur, le texte et le magasin pour Elasticsearch (clé d'unicité)
+
+            # Construire un review_id basé sur l'auteur, le texte et le magasin (cohérent avec le format historique)
             content = f"{author_name}|{text[:50]}|{store_name}".lower().strip()
             review_id = f"google_{hashlib.md5(content.encode()).hexdigest()[:12]}"
->>>>>>> 0a94fea2a1c880e499e07dc94305bb9cf7d188ad
-            
+
             reviews.append({
                 "source": "google",
                 "store": store_name,
@@ -127,9 +122,9 @@ def get_google_reviews_via_api(store_name, api_key):
                 "text": text,
                 "published_date": published_date
             })
-            
+
         return reviews
-        
+
     except Exception as e:
         log(f"  Erreur lors de l'appel API: {e}")
         return []
@@ -138,7 +133,7 @@ def main():
     log("\n" + "="*60)
     log("  SCRAPING DES AVIS GOOGLE VIA API PLACES - MAGASINS LDLC")
     log("="*60)
-    
+
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key or api_key == "AJOUTEZ_VOTRE_CLE_ICI":
         log("ERREUR CRITIQUE: La variable d'environnement GOOGLE_API_KEY est manquante ou invalide.")
@@ -146,19 +141,19 @@ def main():
         return []
 
     stores = get_stores_list()
-    
+
     all_new_reviews = []
-    
+
     for i, store_name in enumerate(stores):
         log(f"\n[{i+1}/{len(stores)}] {store_name}")
         log("-" * 40)
-        
+
         reviews = get_google_reviews_via_api(store_name, api_key)
-        
+
         if reviews:
             all_new_reviews.extend(reviews)
             log(f"  {len(reviews)} avis récents extraits via l'API.")
-        
+
         # Respecter les quotas API Google (pause symbolique)
         time.sleep(0.5)
 
@@ -171,7 +166,7 @@ def main():
 
 if __name__ == "__main__":
     all_reviews = main()
-    
+
     if all_reviews:
         log("Sauvegarde locale dans Elasticsearch...")
         client = get_es_client()
