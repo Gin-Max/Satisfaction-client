@@ -1,3 +1,4 @@
+import hashlib
 import os
 import time
 import requests
@@ -86,8 +87,9 @@ def get_google_reviews_via_api(store_name, api_key):
                 
             rating = r.get('rating', 0)
             
-            # Construire un review_id basé sur l'auteur et la date pour Elasticsearch (clé d'unicité)
-            review_id = f"{author_name}|{text[:50]}".lower().strip()
+            # Construire un review_id basé sur l'auteur, le texte et le magasin pour Elasticsearch (clé d'unicité)
+            content = f"{author_name}|{text[:50]}|{store_name}".lower().strip()
+            review_id = f"google_{hashlib.md5(content.encode()).hexdigest()[:12]}"
             
             reviews.append({
                 "source": "google",
