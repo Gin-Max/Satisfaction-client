@@ -13,8 +13,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instrument the FastAPI app for Prometheus
+# for Prometheus
 Instrumentator().instrument(app).expose(app)
+
+def pseudonymize_name(name: str) -> str:
+    """pseudonymise un nom d'auteur."""
+    if not name or not isinstance(name, str):
+        return name
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        return f"{parts[0]} {parts[-1][0].upper()}."
+    return name
+
+
+def pseudonymize_doc(doc: dict) -> dict:
+    """applique pseudonymisation sur un document avis avant restitution."""
+    if "author_name" in doc:
+        doc["author_name"] = pseudonymize_name(doc["author_name"])
+    doc.pop("author_id", None)
+    return doc
 
 def build_filters(source: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> list:
     filters = []
@@ -61,7 +78,7 @@ def get_avis(from_: int = 0, size: int = 1000):
     for hit in hits:
         doc = hit["_source"]
         doc["id"] = hit["_id"]
-        avis.append(doc)
+        avis.append(pseudonymize_doc(doc))
         
     return {
         "total_dans_la_base": result["hits"]["total"]["value"],
@@ -75,7 +92,7 @@ def get_avis_by_note(note: int):
     result = es.search(index="reviews", body={
         "query": {"match": {"rating": note}}
     }, size=10000)
-    avis = [hit["_source"] for hit in result["hits"]["hits"]]
+    avis = [pseudonymize_doc(hit["_source"]) for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
 # Récupérer les derniers avis
@@ -87,7 +104,7 @@ def get_avis_recents(limit: int = 10):
         "sort": [{"published_date": {"order": "desc"}}],
         "size": limit
     })
-    avis = [hit["_source"] for hit in result["hits"]["hits"]]
+    avis = [pseudonymize_doc(hit["_source"]) for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
 # Récupérer les avis par source
@@ -96,7 +113,7 @@ def get_avis_by_source(source: str):
     result = es.search(index="reviews", body={
         "query": {"match": {"source": source}}
     }, size=10000)
-    avis = [hit["_source"] for hit in result["hits"]["hits"]]
+    avis = [pseudonymize_doc(hit["_source"]) for hit in result["hits"]["hits"]]
     return {"total": len(avis), "avis": avis}
 
 
@@ -278,7 +295,7 @@ def get_google_store_reviews(store: str, limit: int = 10):
         ]}},
         "sort": [{"published_date": {"order": "desc"}}]
     })
-    return [hit["_source"] for hit in result["hits"]["hits"]]
+    return [pseudonymize_doc(hit["_source"]) for hit in result["hits"]["hits"]]
 
 @app.get("/stats/sentiments")
 def get_stats_sentiments(
@@ -518,7 +535,7 @@ def export_avis(
             {
                 "Date de publication": str(src.get("published_date", ""))[:10],
                 "Note": src.get("rating", ""),
-                "Auteur": src.get("author_name", "Anonyme"),
+                "Auteur": pseudonymize_name(src.get("author_name", "Anonyme")),
                 "Agence": src.get("store", "LDLC Web"),
                 "Commentaire": src.get("text", ""),
                 "Réponse service client": src.get("reply_message", ""),
