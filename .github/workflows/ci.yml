@@ -304,3 +304,111 @@ jobs:
       - name: Arrêt des services
         if: always()
         run: docker compose down
+
+
+  nginx-smoke-test:
+    name: Smoke test streamlit-proxy (nginx)
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+
+      - name: Démarrage de la chaîne API + Streamlit + proxy
+        run: docker compose up -d api streamlit streamlit-proxy
+
+
+      - name: Diagnostic avant attente
+        run: |
+          sleep 15
+          echo "=== docker compose ps ==="
+          docker compose ps
+          echo "=== inspect streamlit (health) ==="
+          docker inspect --format='{{.State.Health.Status}}' streamlit 2>/dev/null || echo "pas de healthcheck ou conteneur absent"
+          echo "=== inspect streamlit-proxy (state) ==="
+          docker inspect --format='{{.State.Status}} (restarts: {{.RestartCount}})' streamlit-proxy 2>/dev/null || echo "conteneur streamlit-proxy absent"
+          echo "=== logs streamlit-proxy ==="
+          docker compose logs streamlit-proxy
+          echo "=== logs streamlit ==="
+          docker compose logs streamlit
+
+
+      - name: Attente du proxy
+        run: |
+          set +e
+          for i in {1..45}; do
+            code=$(curl --silent --output /dev/null --write-out "%{http_code}" http://localhost:8501/)
+            curl_exit=$?
+            echo "Tentative $i — code HTTP: $code (curl exit: $curl_exit)"
+            if [ "$code" = "200" ] || [ "$code" = "401" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "=== docker compose ps ==="
+          docker compose ps
+          echo "=== logs streamlit-proxy ==="
+          docker compose logs streamlit-proxy
+          echo "=== logs streamlit ==="
+          docker compose logs streamlit
+          exit 1
+
+
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs streamlit-proxy streamlit
+
+
+      - name: Arrêt des services
+        if: always()
+        run: docker compose down
+
+
+  monitoring-smoke-test:
+    name: Smoke test Prometheus + Grafana
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+
+      - name: Démarrage de la stack de monitoring
+        run: docker compose up -d prometheus grafana
+
+
+      - name: Attente de Prometheus
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:9090/-/healthy; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs prometheus
+          exit 1
+
+
+      - name: Attente de Grafana
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:3030/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs grafana
+          exit 1
+
+
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs prometheus grafana
+
+
+      - name: Arrêt des services
+        if: always()
+        run: docker compose down
