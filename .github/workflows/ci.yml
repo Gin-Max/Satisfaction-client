@@ -304,3 +304,89 @@ jobs:
       - name: Arrêt des services
         if: always()
         run: docker compose down
+
+
+  nginx-smoke-test:
+    name: Smoke test streamlit-proxy (nginx)
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+
+      - name: Démarrage de la chaîne API + Streamlit + proxy
+        run: docker compose up -d api streamlit streamlit-proxy
+
+
+      - name: Attente du proxy
+        run: |
+          for i in {1..45}; do
+            code=$(curl --silent --output /dev/null --write-out "%{http_code}" http://localhost:8501/)
+            echo "Tentative $i — code HTTP: $code"
+            if [ "$code" = "200" ] || [ "$code" = "401" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs streamlit-proxy streamlit
+          exit 1
+
+
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs streamlit-proxy streamlit
+
+
+      - name: Arrêt des services
+        if: always()
+        run: docker compose down
+
+
+  monitoring-smoke-test:
+    name: Smoke test Prometheus + Grafana
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+
+      - name: Démarrage de la stack de monitoring
+        run: docker compose up -d prometheus grafana
+
+
+      - name: Attente de Prometheus
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:9090/-/healthy; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs prometheus
+          exit 1
+
+
+      - name: Attente de Grafana
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:3030/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs grafana
+          exit 1
+
+
+      - name: Logs en cas d'échec
+        if: failure()
+        run: docker compose logs prometheus grafana
+
+
+      - name: Arrêt des services
+        if: always()
+        run: docker compose down
