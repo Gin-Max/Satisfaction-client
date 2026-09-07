@@ -149,8 +149,6 @@ services:
   streamlit:
     build: ./streamlit
     container_name: streamlit
-    ports:
-      - "8501:8501"
     environment:
       - API_URL=http://api:8000
     depends_on:
@@ -165,6 +163,20 @@ services:
     restart: always
     volumes:
       - ./streamlit/cache:/app/cache
+
+  # proxy auth avant streamlit
+  streamlit-proxy:
+    build: ./nginx
+    container_name: streamlit-proxy
+    ports:
+      - "8501:80"
+    environment:
+      AUTH_USER: admin
+      AUTH_PASSWORD: admin
+    depends_on:
+      streamlit:
+        condition: service_healthy
+    restart: always
 
   # MLOPS - MLFLOW TRACKING SERVER
   mlflow:
