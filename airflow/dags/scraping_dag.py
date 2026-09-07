@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from airflow.decorators import (  # type: ignore (car le Docker tourne sur le conteneur)
+from airflow.decorators import (
     dag,
     task,
 )
@@ -14,9 +14,9 @@ default_args = {
 }
 
 @dag(
-    dag_id="scraping_reviews_weekly",
-    description="Scraping Trustpilot + Google, transform et chargement dans ES",
-    schedule="0 6 * * 1",
+    dag_id="scraping_reviews_daily",
+    description="Scraping Trustpilot + Google (API places, 5 derniers avis/store), transform et chargement dans ES",
+    schedule="0 6 * * *",
     start_date=datetime(2025, 10, 29, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,
@@ -38,8 +38,8 @@ def pipeline():
 
     @task()
     def scrape_google() -> list:
-        """Scrape les avis Google. Retourne la liste des reviews (historique + nouveaux)."""
-        from scraping.scrape_google_reviews import main
+        """Scrape les avis Google. Retourne la liste des reviews (historique + 5 dernioers avis/store)."""
+        from scraping.extract_google import main
         return main()
 
     @task()
