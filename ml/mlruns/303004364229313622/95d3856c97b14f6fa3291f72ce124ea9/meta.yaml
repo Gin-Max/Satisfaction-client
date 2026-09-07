@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/303004364229313622/95d3856c97b14f6fa3291f72ce124ea9/artifacts
+end_time: 1788696080033
+entry_point_name: ''
+experiment_id: '303004364229313622'
+lifecycle_stage: active
+run_id: 95d3856c97b14f6fa3291f72ce124ea9
+run_name: Bench_DistilCamemBERT
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1788696069063
+status: 3
+tags: []
+user_id: issab

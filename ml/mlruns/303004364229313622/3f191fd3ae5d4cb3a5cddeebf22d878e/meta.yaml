@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/303004364229313622/3f191fd3ae5d4cb3a5cddeebf22d878e/artifacts
+end_time: 1788693894172
+entry_point_name: ''
+experiment_id: '303004364229313622'
+lifecycle_stage: active
+run_id: 3f191fd3ae5d4cb3a5cddeebf22d878e
+run_name: HuggingFace_CamemBERT
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1788693879552
+status: 3
+tags: []
+user_id: issab

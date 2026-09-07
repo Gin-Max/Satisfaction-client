@@ -1,0 +1,9 @@
+artifact_location: mlflow-artifacts:/303004364229313622
+creation_time: 1788692512180
+effective_trace_archival_retention: null
+experiment_id: '303004364229313622'
+last_update_time: 1788692512180
+lifecycle_stage: active
+name: Analyse_Sentiment_LDLC
+trace_location: null
+workspace: default
