@@ -125,59 +125,90 @@ def enrich_reviews(reviews: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     return enriched
 
-def backfill_unenriched_reviews(batch_size: int = 500) -> int:
+def backfill_unenriched_reviews(batch_size: int = 2000) -> int:
     """Recherche tous les documents sans 'thematique_predite' dans Elasticsearch
-
-    et les met à jour avec les prédictions ML.
+    et les enrichit par paquets successifs jusqu'à épuisement complet via l'API Scroll.
     """
     client = get_es_client()
 
-    # Requête pour filtrer les documents incomplets
+    # 1. Requête pour filtrer les documents n'ayant pas encore de thématique
     query = {
-        "query": {"bool": {"must_not": {"exists": {"field": "thematique_predite"}}}}}
+        "query": {
+            "bool": {
+                "must_not": {
+                    "exists": {"field": "thematique_predite"}
+                }
+            }
+        }
+    }
 
-    # Comptage des documents à traiter
+    # 2. Comptage initial
     count_res = client.count(index=INDEX_NAME, body=query)
     total_to_update = count_res.get("count", 0)
 
     if total_to_update == 0:
-        print(
-            f"[INFO] Tous les documents de l'index '{INDEX_NAME}' sont déjà enrichis."
-        )
+        print(f"[INFO] Tous les documents de l'index '{INDEX_NAME}' sont déjà enrichis.")
         return 0
 
-    print(
-        f"[INFO] {total_to_update} avis non enrichis trouvés. Lancement du rattrapage..."
+    print(f"[INFO] {total_to_update} avis non enrichis trouvés. Lancement du rattrapage complet...")
+
+    # 3. Initialisation de la recherche Scroll (contexte ouvert pendant 5 minutes)
+    search_res = client.search(
+        index=INDEX_NAME,
+        body=query,
+        size=batch_size,
+        scroll="5m"
     )
 
-    # Récupération des avis non enrichis
-    search_res = client.search(index=INDEX_NAME, body=query, size=batch_size)
+    scroll_id = search_res.get("_scroll_id")
     hits = search_res["hits"]["hits"]
+    total_enriched = 0
 
-    reviews_to_enrich = []
-    doc_ids = []
+    try:
+        # 4. Boucle tant qu'Elasticsearch renvoie des documents
+        while hits:
+            reviews_to_enrich = []
+            doc_ids = []
 
-    for hit in hits:
-        doc_ids.append(hit["_id"])
-        reviews_to_enrich.append(hit["_source"])
+            for hit in hits:
+                doc_ids.append(hit["_id"])
+                reviews_to_enrich.append(hit["_source"])
 
-    # Enrichissement par le modèle ML et les règles Regex
-    enriched_data = enrich_reviews(reviews_to_enrich)
+            # Enrichissement du lot courant
+            enriched_data = enrich_reviews(reviews_to_enrich)
 
-    # Préparation de l'opération de mise à jour Bulk pour Elasticsearch
-    actions = []
-    for doc_id, enriched_doc in zip(doc_ids, enriched_data):
-        action = {
-            "_op_type": "update",
-            "_index": INDEX_NAME,
-            "_id": doc_id,
-            "doc": {
-                "sentiment_predit": enriched_doc.get("sentiment_predit"),
-                "thematique_predite": enriched_doc.get("thematique_predite"),
-            },
-        }
-        actions.append(action)
+            # Préparation des opérations Bulk
+            actions = []
+            for doc_id, enriched_doc in zip(doc_ids, enriched_data):
+                action = {
+                    "_op_type": "update",
+                    "_index": INDEX_NAME,
+                    "_id": doc_id,
+                    "doc": {
+                        "sentiment_predit": enriched_doc.get("sentiment_predit"),
+                        "thematique_predite": enriched_doc.get("thematique_predite"),
+                    },
+                }
+                actions.append(action)
 
-    success_count, _ = bulk(client, actions)
-    print(f"[SUCCÈS] {success_count} documents historiques ont été enrichis.")
-    return success_count
+            # Envoi du lot dans Elasticsearch
+            if actions:
+                success_count, _ = bulk(client, actions)
+                total_enriched += success_count
+                print(f"[PROGRESSION] {total_enriched} / {total_to_update} documents traités...")
+
+            # Récupération du lot suivant avec le scroll_id
+            scroll_res = client.scroll(scroll_id=scroll_id, scroll="5m")
+            scroll_id = scroll_res.get("_scroll_id")
+            hits = scroll_res["hits"]["hits"]
+
+    finally:
+        # 5. Nettoyage du curseur Scroll côté Elasticsearch pour libérer la mémoire du serveur
+        if scroll_id:
+            try:
+                client.clear_scroll(scroll_id=scroll_id)
+            except Exception:
+                pass
+
+    print(f"[SUCCÈS] Rattrapage terminé : {total_enriched} documents historiques ont été enrichis.")
+    return total_enriched
