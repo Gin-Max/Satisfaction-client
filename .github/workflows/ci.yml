@@ -278,11 +278,17 @@ jobs:
         run: docker compose up -d api streamlit
 
 
-      - name: Attente de Streamlit
+      - name: Attente de l'état healthy de Streamlit
         run: |
           for i in {1..30}; do
-            if curl --fail --silent http://localhost:8501/_stcore/health; then
+            status=$(docker inspect --format='{{.State.Health.Status}}' streamlit 2>/dev/null || echo "starting")
+            echo "Tentative $i — statut: $status"
+            if [ "$status" = "healthy" ]; then
               exit 0
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              echo "Conteneur Streamlit signalé unhealthy, arrêt anticipé."
+              break
             fi
             sleep 2
           done
