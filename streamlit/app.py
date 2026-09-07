@@ -181,7 +181,8 @@ def get_google_store_distribution(store: str):
         return r.json() if r.ok else {}
     except Exception:
         return {}
-    
+
+
 @st.cache_data(ttl=300)
 def get_date_min(source: str):
     try:
@@ -530,114 +531,113 @@ if page == "📊 Trustpilot":
         else:
             st.info("Aucune donnée disponible.")
 
+    # thématiques + matrice, sur la même ligne
+    col_theme, col_matrice = st.columns(2)
 
-    st.subheader(" Répartition par thématique prédite")
-    theme_data = get_stats_thematiques(
-        source="trustpilot",
-        date_from=df_str,
-        date_to=dt_str,
-    )
-    themes = theme_data.get("thematiques", [])
-
-    if themes:
-        df_themes = pd.DataFrame(themes).sort_values("count", ascending=True)
-        fig_theme = px.bar(
-            df_themes,
-            x="count",
-            y="thematique",
-            orientation="h",
-            labels={"count": "Nombre d'avis", "thematique": "Thématique"},
-            text="count",
-            color_discrete_sequence=["#2980b9"],
-        )
-        fig_theme.update_traces(textposition="outside")
-        fig_theme.update_layout(
-            margin=dict(t=20, b=20, l=10, r=10),
-            xaxis_title="Nombre d'avis",
-            yaxis_title="",
-        )
-
-        # 1. Capture du clic sur le graphique des thématiques Trustpilot
-        event_tp_themes = st.plotly_chart(
-            fig_theme,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="points",
-            key="chart_tp_thematiques",
-        )
-        gerer_export_graphique(
-            event=event_tp_themes,
-            type_filtre="thematique",
+    with col_theme:
+        st.subheader("Répartition par thématique prédite")
+        theme_data = get_stats_thematiques(
             source="trustpilot",
             date_from=df_str,
             date_to=dt_str,
-            cle_unique="tp_thematiques",
         )
-    else:
-        st.info("Aucune donnée thématique disponible.")
+        themes = theme_data.get("thematiques", [])
 
-    st.markdown("---")
-
-    # Matrice Thématique x Sentiment
-    st.subheader("Taux de satisfaction par thématique")
-    matrice_data = get_stats_thematiques_sentiments(
-        source="trustpilot",
-        date_from=df_str,
-        date_to=dt_str,
-    )
-    items_matrice = matrice_data.get("matrice", [])
-
-    if items_matrice:
-        df_mat = pd.DataFrame(items_matrice)
-        fig_mat = px.bar(
-            df_mat,
-            x="pourcentage",
-            y="thematique",
-            color="sentiment",
-            orientation="h",
-            labels={
-                "pourcentage": "Proportion (%)",
-                "thematique": "Thématique",
-                "sentiment": "Sentiment",
-            },
-            text=df_mat["pourcentage"].apply(lambda v: f"{v}%"),
-            color_discrete_map={
-                "Positif": "#27ae60",
-                "Négatif": "#e74c3c",
-                "Neutre": "#95a5a6",
-            },
-        )
-        fig_mat.update_layout(
-            barmode="stack",
-            xaxis=dict(range=[0, 100]),
-            margin=dict(t=20, b=20, l=10, r=10),
-            legend=dict(
+        if themes:
+            df_themes = pd.DataFrame(themes).sort_values("count", ascending=True)
+            fig_theme = px.bar(
+                df_themes,
+                x="count",
+                y="thematique",
                 orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-            ),
-        )
+                labels={"count": "Nombre d'avis", "thematique": "Thématique"},
+                text="count",
+                color_discrete_sequence=["#2980b9"],
+            )
+            fig_theme.update_traces(textposition="outside")
+            fig_theme.update_layout(
+                margin=dict(t=20, b=20, l=10, r=10),
+                xaxis_title="Nombre d'avis",
+                yaxis_title="",
+            )
 
-        # 2. Capture du clic sur la matrice Trustpilot
-        event_tp_matrice = st.plotly_chart(
-            fig_mat,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="points",
-            key="chart_tp_matrice",
-        )
-        gerer_export_graphique(
-            event=event_tp_matrice,
-            type_filtre="matrice",
+            event_tp_themes = st.plotly_chart(
+                fig_theme,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key="chart_tp_thematiques",
+            )
+            gerer_export_graphique(
+                event=event_tp_themes,
+                type_filtre="thematique",
+                source="trustpilot",
+                date_from=df_str,
+                date_to=dt_str,
+                cle_unique="tp_thematiques",
+            )
+        else:
+            st.info("Aucune donnée thématique disponible.")
+
+    with col_matrice:
+        st.subheader("Taux de satisfaction par thématique")
+        matrice_data = get_stats_thematiques_sentiments(
             source="trustpilot",
             date_from=df_str,
             date_to=dt_str,
-            cle_unique="tp_matrice",
         )
-    else:
-        st.info("Données croisées indisponibles.")
+        items_matrice = matrice_data.get("matrice", [])
+
+        if items_matrice:
+            df_mat = pd.DataFrame(items_matrice)
+            fig_mat = px.bar(
+                df_mat,
+                x="pourcentage",
+                y="thematique",
+                color="sentiment",
+                orientation="h",
+                labels={
+                    "pourcentage": "Proportion (%)",
+                    "thematique": "Thématique",
+                    "sentiment": "Sentiment",
+                },
+                text=df_mat["pourcentage"].apply(lambda v: f"{v}%"),
+                color_discrete_map={
+                    "Positif": "#27ae60",
+                    "Négatif": "#e74c3c",
+                    "Neutre": "#95a5a6",
+                },
+            )
+            fig_mat.update_layout(
+                barmode="stack",
+                xaxis=dict(range=[0, 100]),
+                margin=dict(t=20, b=20, l=10, r=10),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                ),
+            )
+
+            event_tp_matrice = st.plotly_chart(
+                fig_mat,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key="chart_tp_matrice",
+            )
+            gerer_export_graphique(
+                event=event_tp_matrice,
+                type_filtre="matrice",
+                source="trustpilot",
+                date_from=df_str,
+                date_to=dt_str,
+                cle_unique="tp_matrice",
+            )
+        else:
+            st.info("Données croisées indisponibles.")
 
     st.markdown("---")
 
@@ -820,110 +820,110 @@ elif page == "🗺️ Google":
         else:
             st.warning("Aucun avis disponible.")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # Thématiques pour l'agence sélectionnée
-    st.subheader(f"Thématiques dominantes – {selected_store}")
-    store_theme_data = get_stats_thematiques(
-        source="google", store=selected_store
-    )
-    store_themes = store_theme_data.get("thematiques", [])
+    # Thématiques + matrice, sur la même ligne
+    col_theme_g, col_matrice_g = st.columns(2)
 
-    if store_themes:
-        df_store_themes = pd.DataFrame(store_themes).sort_values(
-            "count", ascending=True
+    with col_theme_g:
+        st.subheader(f"Thématiques dominantes – {selected_store}")
+        store_theme_data = get_stats_thematiques(
+            source="google", store=selected_store
         )
-        fig_st_theme = px.bar(
-            df_store_themes,
-            x="count",
-            y="thematique",
-            orientation="h",
-            labels={"count": "Nombre d'avis", "thematique": "Thématique"},
-            text="count",
-            color_discrete_sequence=["#16a085"],
-        )
-        fig_st_theme.update_traces(textposition="outside")
-        fig_st_theme.update_layout(
-            margin=dict(t=20, b=20, l=10, r=10),
-            xaxis_title="Nombre d'avis",
-            yaxis_title="",
-        )
+        store_themes = store_theme_data.get("thematiques", [])
 
-        # 2. Capture du clic sur les thématiques de l'agence Google
-        event_gg_themes = st.plotly_chart(
-            fig_st_theme,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="points",
-            key=f"chart_gg_themes_{selected_store}",
-        )
-        gerer_export_graphique(
-            event=event_gg_themes,
-            type_filtre="thematique",
-            source="google",
-            store=selected_store,
-            cle_unique=f"gg_themes_{selected_store}",
-        )
-    else:
-        st.info("Aucune thématique enregistrée pour cette agence.")
-
-    st.markdown("---")
-    
-    # Matrice Thématique x Sentiment pour l'agence Google sélectionnée
-    st.subheader(f"Taux de satisfaction par thématique – {selected_store}")
-    store_matrice_data = get_stats_thematiques_sentiments(
-        source="google",
-        store=selected_store,
-    )
-    store_matrice_items = store_matrice_data.get("matrice", [])
-
-    if store_matrice_items:
-        df_store_mat = pd.DataFrame(store_matrice_items)
-        fig_store_mat = px.bar(
-            df_store_mat,
-            x="pourcentage",
-            y="thematique",
-            color="sentiment",
-            orientation="h",
-            labels={
-                "pourcentage": "Proportion (%)",
-                "thematique": "Thématique",
-                "sentiment": "Sentiment",
-            },
-            text=df_store_mat["pourcentage"].apply(lambda v: f"{v}%"),
-            color_discrete_map={
-                "Positif": "#27ae60",
-                "Négatif": "#e74c3c",
-                "Neutre": "#95a5a6",
-            },
-        )
-        fig_store_mat.update_layout(
-            barmode="stack",
-            xaxis=dict(range=[0, 100]),
-            margin=dict(t=20, b=20, l=10, r=10),
-            legend=dict(
+        if store_themes:
+            df_store_themes = pd.DataFrame(store_themes).sort_values(
+                "count", ascending=True
+            )
+            fig_st_theme = px.bar(
+                df_store_themes,
+                x="count",
+                y="thematique",
                 orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-            ),
-        )
+                labels={"count": "Nombre d'avis", "thematique": "Thématique"},
+                text="count",
+                color_discrete_sequence=["#16a085"],
+            )
+            fig_st_theme.update_traces(textposition="outside")
+            fig_st_theme.update_layout(
+                margin=dict(t=20, b=20, l=10, r=10),
+                xaxis_title="Nombre d'avis",
+                yaxis_title="",
+            )
 
-        # 3. Capture du clic sur la matrice Google
-        event_gg_matrice = st.plotly_chart(
-            fig_store_mat,
-            use_container_width=True,
-            on_select="rerun",
-            selection_mode="points",
-            key=f"chart_gg_matrice_{selected_store}",
-        )
-        gerer_export_graphique(
-            event=event_gg_matrice,
-            type_filtre="matrice",
+            event_gg_themes = st.plotly_chart(
+                fig_st_theme,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key=f"chart_gg_themes_{selected_store}",
+            )
+            gerer_export_graphique(
+                event=event_gg_themes,
+                type_filtre="thematique",
+                source="google",
+                store=selected_store,
+                cle_unique=f"gg_themes_{selected_store}",
+            )
+        else:
+            st.info("Aucune thématique enregistrée pour cette agence.")
+
+    with col_matrice_g:
+        st.subheader(f"Taux de satisfaction par thématique – {selected_store}")
+        store_matrice_data = get_stats_thematiques_sentiments(
             source="google",
             store=selected_store,
-            cle_unique=f"gg_matrice_{selected_store}",
         )
-    else:
-        st.info("Données croisées indisponibles pour cette agence.")
+        store_matrice_items = store_matrice_data.get("matrice", [])
+
+        if store_matrice_items:
+            df_store_mat = pd.DataFrame(store_matrice_items)
+            fig_store_mat = px.bar(
+                df_store_mat,
+                x="pourcentage",
+                y="thematique",
+                color="sentiment",
+                orientation="h",
+                labels={
+                    "pourcentage": "Proportion (%)",
+                    "thematique": "Thématique",
+                    "sentiment": "Sentiment",
+                },
+                text=df_store_mat["pourcentage"].apply(lambda v: f"{v}%"),
+                color_discrete_map={
+                    "Positif": "#27ae60",
+                    "Négatif": "#e74c3c",
+                    "Neutre": "#95a5a6",
+                },
+            )
+            fig_store_mat.update_layout(
+                barmode="stack",
+                xaxis=dict(range=[0, 100]),
+                margin=dict(t=20, b=20, l=10, r=10),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                ),
+            )
+
+            event_gg_matrice = st.plotly_chart(
+                fig_store_mat,
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points",
+                key=f"chart_gg_matrice_{selected_store}",
+            )
+            gerer_export_graphique(
+                event=event_gg_matrice,
+                type_filtre="matrice",
+                source="google",
+                store=selected_store,
+                cle_unique=f"gg_matrice_{selected_store}",
+            )
+        else:
+            st.info("Données croisées indisponibles pour cette agence.")
+    
