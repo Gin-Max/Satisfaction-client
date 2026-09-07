@@ -139,29 +139,61 @@ def get_distribution_notes(source: Optional[str] = None, date_from: Optional[str
     }
 
 @app.get("/stats/evolution-mensuelle")
-def get_evolution_mensuelle(source: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None):
+def get_evolution_mensuelle(
+    source: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    split_provenance: bool = False,
+):
     filters = build_filters(source, date_from, date_to)
     query = {"bool": {"filter": [{"exists": {"field": "published_date"}}] + filters}} if filters else {"exists": {"field": "published_date"}}
+
+    date_histogram_agg = {
+        "field": "published_date",
+        "calendar_interval": "month",
+        "format": "yyyy-MM",
+    }
+
+    if split_provenance:
+        aggs = {
+            "par_mois": {
+                "date_histogram": date_histogram_agg,
+                "aggs": {
+                    "par_provenance": {
+                        "terms": {"field": "provenance", "size": 20}
+                    }
+                },
+            }
+        }
+    else:
+        aggs = {"par_mois": {"date_histogram": date_histogram_agg}}
+
     result = es.search(index="reviews", body={
         "size": 0,
         "query": query,
-        "aggs": {
-            "par_mois": {
-                "date_histogram": {
-                    "field": "published_date",
-                    "calendar_interval": "month",
-                    "format": "yyyy-MM"
-                }
-            }
-        }
+        "aggs": aggs
     })
     buckets = result["aggregations"]["par_mois"]["buckets"]
-    return {
-        "evolution": [
-            {"mois": b["key_as_string"], "count": b["doc_count"]}
-            for b in buckets
-        ]
-    }
+
+    if not split_provenance:
+        return {
+            "evolution": [
+                {"mois": b["key_as_string"], "count": b["doc_count"]}
+                for b in buckets
+            ]
+        }
+
+    evolution = []
+    for b in buckets:
+        row = {"mois": b["key_as_string"], "Organique": 0, "Invitation": 0}
+        for pb in b.get("par_provenance", {}).get("buckets", []):
+            if pb["key"] == "Organic":
+                row["Organique"] += pb["doc_count"]
+            else:
+                row["Invitation"] += pb["doc_count"]
+        evolution.append(row)
+
+    return {"evolution": evolution}
 
 @app.get("/stats/taux-reponse")
 def get_taux_reponse():

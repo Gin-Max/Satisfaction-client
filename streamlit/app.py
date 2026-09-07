@@ -90,6 +90,18 @@ def get_stats_distribution(source: str, date_from: str = None, date_to: str = No
     except Exception:
         return {}
 
+@st.cache_data(ttl=300)
+def get_stats_evolution_provenance(source: str, date_from: str = None, date_to: str = None):
+    params = {"source": source, "split_provenance": True}
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+    try:
+        r = requests.get(f"{API_URL}/stats/evolution-mensuelle", params=params, timeout=10)
+        return r.json() if r.ok else {}
+    except Exception:
+        return {}
 
 @st.cache_data(ttl=300)
 def get_stats_evolution(source: str, date_from: str = None, date_to: str = None):
@@ -515,18 +527,26 @@ if page == "📊 Trustpilot":
     # evo mensu
     with col_right:
         st.subheader("Évolution mensuelle")
-        evol_data = get_stats_evolution("trustpilot", df_str, dt_str)
+        evol_data = get_stats_evolution_provenance("trustpilot", df_str, dt_str)
         months = evol_data.get("evolution", [])
         if months:
             df_evol = pd.DataFrame(months)
-            fig2 = px.line(
-                df_evol,
-                x="mois",
-                y="count",
-                markers=True,
-                labels={"mois": "Mois", "count": "Nombre d'avis"},
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                x=df_evol["mois"], y=df_evol["Organique"],
+                mode="lines+markers", name="Organique",
+                line=dict(color="#2ecc71"),
+            ))
+            fig2.add_trace(go.Scatter(
+                x=df_evol["mois"], y=df_evol["Invitation"],
+                mode="lines+markers", name="Invitation",
+                line=dict(color="#3498db"),
+            ))
+            fig2.update_layout(
+                xaxis_title="Mois",
+                yaxis_title="Nombre d'avis",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
-            fig2.update_traces(line_color="#3498db")
             st.plotly_chart(fig2, use_container_width=True)
         else:
             st.info("Aucune donnée disponible.")
