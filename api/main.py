@@ -242,7 +242,7 @@ def get_google_stores():
         "query": {"term": {"source": "google"}},
         "aggs": {
             "par_store": {
-                "terms": {"field": "store.keyword", "size": 100},
+                "terms": {"field": "store", "size": 100},
                 "aggs": {
                     "note_moyenne": {"avg": {"field": "rating"}},
                 }
@@ -267,7 +267,7 @@ def get_google_store_distribution(store: str):
         "size": 0,
         "query": {"bool": {"filter": [
             {"term": {"source": "google"}},
-            {"term": {"store.keyword": store}}
+            {"term": {"store": store}}
         ]}},
         "aggs": {
             "par_note": {
@@ -291,7 +291,7 @@ def get_google_store_reviews(store: str, limit: int = 10):
         "size": limit,
         "query": {"bool": {"filter": [
             {"term": {"source": "google"}},
-            {"term": {"store.keyword": store}}
+            {"term": {"store": store}}
         ]}},
         "sort": [{"published_date": {"order": "desc"}}]
     })
