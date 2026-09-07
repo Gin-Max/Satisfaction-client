@@ -55,7 +55,7 @@ def load_to_elasticsearch(reviews, client, index_name=INDEX_NAME):
             "_index": index_name,
             "_id": review["review_id"],
             "_source": review,
-            "op_type": "create"
+            "_op_type": "create"
         }
         for review in reviews
     ]
