@@ -132,13 +132,13 @@ def scrape_pages(num_pages=10):
 
 
 def load_historical_reviews():
-    """Charge les reviews historiques depuis le JSON."""
+    """Charge les reviews historiques Trustpilot depuis le JSON."""
     if not os.path.exists(HISTORICAL_JSON):
         print("Pas de fichier historique trouvé.")
         return []
     with open(HISTORICAL_JSON, "r", encoding="utf-8") as f:
         existing_reviews = json.load(f)
-    print(f"{len(existing_reviews)} reviews historiques chargées")
+    print(f"{len(existing_reviews)} reviews historiques Trustpilot chargées")
     return existing_reviews
 
 def is_trustpilot_empty(client):
@@ -151,10 +151,4 @@ def is_trustpilot_empty(client):
         return True
 
 def main():
-    from scraping.load import get_es_client
-    client = get_es_client()
-    existing_reviews = load_historical_reviews() if is_trustpilot_empty(client) else []
-    new_reviews = scrape_pages(num_pages=10)
-    print(f"\n=== FIN SCRAPING ===")
-    print(f"New reviews: {len(new_reviews)}")
-    return existing_reviews + new_reviews
+    return scrape_pages(num_pages=10)

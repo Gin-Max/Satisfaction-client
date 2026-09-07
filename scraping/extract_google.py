@@ -3,9 +3,31 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from scraping.load import get_es_client, create_index_if_not_exists, load_to_elasticsearch, INDEX_NAME
+import json
 
 def log(message):
     print(message)
+
+HISTORICAL_GOOGLE_JSON = os.path.join(os.path.dirname(__file__), "..", "data", "google_reviews.json")
+
+def is_google_empty(client):
+    try:
+        result = client.count(index=INDEX_NAME, body={
+            "query": {"term": {"source": "google"}}
+        })
+        return result["count"] == 0
+    except Exception:
+        return True
+
+def load_historical_google_reviews() -> list:
+    """Charge les reviews historiques Google depuis le JSON."""
+    if not os.path.exists(HISTORICAL_GOOGLE_JSON):
+        print("Pas de fichier historique Google trouvé.")
+        return []
+    with open(HISTORICAL_GOOGLE_JSON, encoding="utf-8") as f:
+        existing_reviews = json.load(f)
+    print(f"{len(existing_reviews)} reviews historiques Google chargées")
+    return existing_reviews
 
 def get_stores_list():
     """
@@ -87,7 +109,7 @@ def get_google_reviews_via_api(store_name, api_key):
             rating = r.get('rating', 0)
             
             # Construire un review_id basé sur l'auteur et la date pour Elasticsearch (clé d'unicité)
-            review_id = f"{author_name}|{text[:50]}".lower().strip()
+            review_id = f"{author_name}|{text[:50]}|{store_name}".lower().strip()
             
             reviews.append({
                 "source": "google",

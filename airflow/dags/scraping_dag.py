@@ -21,9 +21,37 @@ default_args = {
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
-    tags=["reviews", "weekly"],
+    tags=["reviews", "daily"],
 )
 def pipeline():
+
+    @task()
+    def init_ES():
+        """Crée l'index Elasticsearch si nécessaire et charge l'historique
+        Trustpilot/Google si aucune donnée n'est encore présente pour ces sources."""
+        from scraping.load import INDEX_NAME, create_index_if_not_exists, get_es_client, load_to_elasticsearch
+        from scraping.transform import transform
+        from scraping.extract_trustpilot import is_trustpilot_empty, load_historical_reviews
+        from scraping.extract_google import is_google_empty, load_historical_google_reviews
+
+        client = get_es_client()
+        create_index_if_not_exists(client, INDEX_NAME)
+
+        if is_trustpilot_empty(client):
+            historical_tp = load_historical_reviews()
+            final_tp = transform([], historical_tp)
+            load_to_elasticsearch(final_tp, client)
+            print(f"[INFO] Bootstrap Trustpilot : {len(final_tp)} avis chargés.")
+        else:
+            print("[INFO] Données Trustpilot déjà présentes, pas de bootstrap.")
+
+        if is_google_empty(client):
+            historical_google = load_historical_google_reviews()
+            load_to_elasticsearch(historical_google, client)
+            print(f"[INFO] Bootstrap Google : {len(historical_google)} avis chargés.")
+        else:
+            print("[INFO] Données Google déjà présentes, pas de bootstrap.")
+
 
     @task()
     def backfill_existing_reviews():
@@ -33,12 +61,13 @@ def pipeline():
 
     @task()
     def scrape_trustpilot() -> list:
+        """Récupère les dernières pages Trustpilot."""
         from scraping.extract_trustpilot import main
         return main()
 
     @task()
     def scrape_google() -> list:
-        """Scrape les avis Google. Retourne la liste des reviews (historique + 5 dernioers avis/store)."""
+        """Récupère les avis Google. Retourne la liste des reviews (5 derniers avis/store)."""
         from scraping.extract_google import main
         return main()
 
@@ -81,11 +110,20 @@ def pipeline():
         create_index_if_not_exists(client, INDEX_NAME)
         load_to_elasticsearch(google_reviews, client)
 
-    backfill_existing_reviews()
+
+    init = init_ES()
+
+    backfill = backfill_existing_reviews()
+    init >> backfill
+
     tp = scrape_trustpilot()
     tp_enriched = enrich_trustpilot(tp)
+    init >> tp
+
     google = scrape_google()
     google_enriched = enrich_google(google)
+    init >> google
+
     load_trustpilot(tp_enriched)
     load_google(google_enriched)
 
