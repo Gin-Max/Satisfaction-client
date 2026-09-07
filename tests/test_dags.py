@@ -6,7 +6,7 @@ from airflow.utils.dag_cycle_tester import check_cycle
 
 
 DAGS_FOLDER = Path(__file__).resolve().parents[1] / "airflow" / "dags"
-DAG_ID = "scraping_reviews_weekly"
+DAG_ID = "scraping_reviews_daily"
 
 
 @pytest.fixture(scope="module")
