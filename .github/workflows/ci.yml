@@ -1,3 +1,40 @@
+
+Avatar de profil
+
+Pièce jointe
+
+		
+		
+		
+		
+
+	
+	
+	
+	
+	
+	
+	
+	
+
+	
+	
+	
+	
+	
+	
+	
+	
+
+		
+		
+		
+		
+		
+		
+		
+		
+
 name: CI
 
 
@@ -320,17 +357,39 @@ jobs:
         run: docker compose up -d api streamlit streamlit-proxy
 
 
+      - name: Diagnostic avant attente
+        run: |
+          sleep 15
+          echo "=== docker compose ps ==="
+          docker compose ps
+          echo "=== inspect streamlit (health) ==="
+          docker inspect --format='{{.State.Health.Status}}' streamlit 2>/dev/null || echo "pas de healthcheck ou conteneur absent"
+          echo "=== inspect streamlit-proxy (state) ==="
+          docker inspect --format='{{.State.Status}} (restarts: {{.RestartCount}})' streamlit-proxy 2>/dev/null || echo "conteneur streamlit-proxy absent"
+          echo "=== logs streamlit-proxy ==="
+          docker compose logs streamlit-proxy
+          echo "=== logs streamlit ==="
+          docker compose logs streamlit
+
+
       - name: Attente du proxy
         run: |
+          set +e
           for i in {1..45}; do
             code=$(curl --silent --output /dev/null --write-out "%{http_code}" http://localhost:8501/)
-            echo "Tentative $i — code HTTP: $code"
+            curl_exit=$?
+            echo "Tentative $i — code HTTP: $code (curl exit: $curl_exit)"
             if [ "$code" = "200" ] || [ "$code" = "401" ]; then
               exit 0
             fi
             sleep 2
           done
-          docker compose logs streamlit-proxy streamlit
+          echo "=== docker compose ps ==="
+          docker compose ps
+          echo "=== logs streamlit-proxy ==="
+          docker compose logs streamlit-proxy
+          echo "=== logs streamlit ==="
+          docker compose logs streamlit
           exit 1
 
 
