@@ -22,7 +22,9 @@ docker-compose up -d --build
 | FastAPI Docs  | http://localhost:8000/docs | Documentation API       |
 | Airflow       | http://localhost:8080      | Dags Airflow            |
 | Streamlit     | http://localhost:8501      | Dashboard Streamlit     |
-| MLFlow        | http://localhost:5000      | MLFlow Experiments      |
+| MLFlow        | http://localhost:5050      | MLFlow Experiments      |
+| Grafana       | http://localhost:3030      | Grafana                 |
+
 
 | Route                 | Description                           |
 | --------------------- | ------------------------------------- |
@@ -39,7 +41,7 @@ satisfaction-client/
 ├── ml/             ← modèle NLP (à venir)
 ├── streamlit/      ← Dashboard streamlit
 ├── airflow/        ← dags airflow
-└── monitoring/     ← Prometheus + Grafana (à venir)
+└── monitoring/     ← Prometheus + Grafana
 
 # vérifier le nombre d'avis sur elasticsearch
 curl http://localhost:9200/reviews/_count
